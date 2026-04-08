@@ -4,3 +4,4 @@ Team members:
 
 David Isaac Mijares Meza (32948)
 Jose Manuel Paez Sandoval (37945)
+Aldo Sebastian De La Torre Gomez (37969)
