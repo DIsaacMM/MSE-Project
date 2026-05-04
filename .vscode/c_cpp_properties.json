@@ -1,0 +1,20 @@
+{
+    "configurations": [
+        {
+            "name": "ARM none eabi GCC",
+            "includePath": [ // Add all the include paths here
+                "CMSIS/Core/include",
+                "CMSIS/STM32F4xx/include", 
+                "${workspaceFolder}", 
+                "${workspaceFolder}/includes"
+            ],
+            "defines": [ // Add all the project defines here
+                "STM32F411xE"
+            ],
+            "cStandard": "c99",
+            "compilerPath": "C:/Program Files/Arm/GNU Toolchain mingw-w64-x86_64-arm-none-eabi/bin/arm-none-eabi-gcc.exe", 
+            "intelliSenseMode": "windows-gcc-arm"
+        }
+    ],
+    "version": 4
+}
