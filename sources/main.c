@@ -16,27 +16,26 @@
 #define FREQUENCY 1000      // Frequency = 1kHz
 
 // Motor 1 Global Constants
-#define MOTOR_1_PIN 1           // Pin implemented in the main 
+#define MOTOR_1_PIN 0          // Pin implemented in the main 
 #define MOTOR_1_GPIO A         // PWM's GPIO that will be implemented in the main
 #define MOTOR_1_CHANNEL channel_1  // Channel that will be implemented in the main for the TIMx
 
 // Motor 2 Global Constants
 #define MOTOR_2_PIN 1           // Pin implemented in the main 
 #define MOTOR_2_GPIO A         // PWM's GPIO that will be implemented in the main
-#define MOTOR_2_CHANNEL channel_1  // Channel that will be implemented in the main for the TIMx
+#define MOTOR_2_CHANNEL channel_2  // Channel that will be implemented in the main for the TIMx
 
 // Motor 3 Global Constants
-#define MOTOR_3_PIN 1           // Pin implemented in the main 
+#define MOTOR_3_PIN 3           // Pin implemented in the main 
 #define MOTOR_3_GPIO A         // PWM's GPIO that will be implemented in the main
-#define MOTOR_3_CHANNEL channel_1  // Channel that will be implemented in the main for the TIMx
+#define MOTOR_3_CHANNEL channel_3  // Channel that will be implemented in the main for the TIMx
 
 // Motor 4 Global Constants
-#define MOTOR_4_PIN 1           // Pin implemented in the main 
+#define MOTOR_4_PIN 3           // Pin implemented in the main 
 #define MOTOR_4_GPIO A         // PWM's GPIO that will be implemented in the main
-#define MOTOR_4_CHANNEL channel_1  // Channel that will be implemented in the main for the TIMx
+#define MOTOR_4_CHANNEL channel_4  // Channel that will be implemented in the main for the TIMx
 
-// Function prototypes
-void PWM_init(void);
+
 
 int main(void)
 { 
