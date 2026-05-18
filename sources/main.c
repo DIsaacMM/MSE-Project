@@ -14,7 +14,7 @@
 
 // Motor Global Constants
 #define MOTOR_TIM TIM_2          // TIM that will be implemented in the main
-#define FREQUENCY 50      // Frequency = 1kHz
+#define FREQUENCY 50      // Frequency = 50Hz
 
 // Motor 1 Global Constants
 #define MOTOR_1_PIN 0          // Pin implemented in the main 
@@ -27,7 +27,7 @@
 #define MOTOR_2_CHANNEL channel_2  // Channel that will be implemented in the main for the TIMx
 
 // Motor 3 Global Constants
-#define MOTOR_3_PIN 3           // Pin implemented in the main 
+#define MOTOR_3_PIN 2           // Pin implemented in the main 
 #define MOTOR_3_GPIO A         // PWM's GPIO that will be implemented in the main
 #define MOTOR_3_CHANNEL channel_3  // Channel that will be implemented in the main for the TIMx
 
@@ -48,7 +48,7 @@
 int main(void)
 { 
     
-    uint8_t duty_cycle1 = 0;
+    uint8_t duty_cycle1 = ESC_MIN_DUTY;
     uint8_t duty_cycle2 = 0;
     uint8_t duty_cycle3 = 0;
     uint8_t duty_cycle4 = 0;
