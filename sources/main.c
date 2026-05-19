@@ -37,13 +37,8 @@
 // MOTOR 1 CONFIGURATION
 // ======================================================
 
-// PA0 -> TIM2_CH1
 #define MOTOR_1_PIN 0
-
-// GPIO port
 #define MOTOR_1_GPIO A
-
-// Timer channel
 #define MOTOR_1_CHANNEL channel_1
 
 // ======================================================
@@ -86,7 +81,7 @@
 #define ESC_ARM_DUTY 5
 
 // Low throttle for slow motor spin
-#define ESC_SLOW_DUTY 6
+#define ESC_TEST_DUTY 6
 
 /**
  * @brief Main program
@@ -137,7 +132,7 @@ int main(void)
 
     // Send low throttle signal
     // so the motor spins slowly
-    pwm_setSignal(MOTOR_TIM, MOTOR_1_CHANNEL, FREQUENCY, ESC_SLOW_DUTY);
+    pwm_setSignal(MOTOR_TIM, MOTOR_1_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
 
     // ==================================================
     // MAIN LOOP
@@ -145,8 +140,7 @@ int main(void)
 
     while (1)
     {
-        // PWM runs in hardware,
-        // nothing else is required here
+        // Delay for 1 second
         timer_delay_ms(DELAY_TIM, 1000);
     }
 

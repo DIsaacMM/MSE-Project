@@ -6,8 +6,10 @@
  * It uses TIM2 in polling mode to create accurate delays
  * without consuming CPU cycles in software loops.
  *
- * @authors David Mijares, Ximena Cedillo, Xavier Clemente
- *
+ * @authors 
+ * David Mijares
+ * Aldo De la Torre
+ * Jose Paez
  */
 
 #include "Timer.h"

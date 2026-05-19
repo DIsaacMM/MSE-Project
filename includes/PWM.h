@@ -28,9 +28,9 @@
  *  - PWM output enable/disable
  *
  * @authors
- * David Mijares,
- * Ximena Cedillo,
- * Xavier Clemente
+ * David Mijares
+ * Aldo De la Torre
+ * Jose Paez
  */
 
 // ======================================================

@@ -5,7 +5,10 @@
  * This module provides functions to configure and use STM32 timers
  * for delays, frequency generation, and compare modes.
  *
- * @authors David Mijares, Ximena Cedillo, Xavier Clemente
+ * @authors 
+ * David Mijares
+ * Aldo De la Torre
+ * Jose Paez
  *
  */
 

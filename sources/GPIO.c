@@ -5,8 +5,10 @@
  * The user may use this module with multiple functions to:
  * Initialize a STM32 GPIO port and manipulate a specific pin 
  *
- * @authors David Mijares, Ximena Cedillo, Xavier Clemente
- *
+ * @authors 
+ * David Mijares
+ * Aldo De la Torre
+ * Jose Paez
  */
 #include "GPIO.h"
 

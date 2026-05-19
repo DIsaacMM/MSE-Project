@@ -21,9 +21,9 @@
  *  - Hardware timer outputs
  *
  * @authors
- * David Mijares,
- * Ximena Cedillo,
- * Xavier Clemente
+ * David Mijares
+ * Aldo De la Torre
+ * Jose Paez
  */
 
 #include "PWM.h"
