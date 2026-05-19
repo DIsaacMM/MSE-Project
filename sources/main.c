@@ -44,50 +44,75 @@
 #define ESC_MIN_DUTY 5
 #define ESC_MAX_DUTY 10
 
+// ESC Servo PWM:
+//
+// 5  -> 1000 us
+// 7  -> 1400 us
+// 10 -> 2000 us
+
+// Minimum valid throttle
+#define ESC_ARM_DUTY 5
+
+// Very low throttle for slow spin
+#define ESC_SLOW_DUTY 6
 
 int main(void)
-{ 
-    
-    uint8_t duty_cycle1 = ESC_MIN_DUTY;
-    uint8_t duty_cycle2 = 0;
-    uint8_t duty_cycle3 = 0;
-    uint8_t duty_cycle4 = 0;
-    
-    // Initialize Motor 1
-    pwm_init(MOTOR_1_GPIO, MOTOR_TIM, MOTOR_1_PIN);
-    pwm_setSignal(MOTOR_TIM, MOTOR_1_CHANNEL, FREQUENCY, duty_cycle1);
-    pwm_start(MOTOR_TIM, MOTOR_1_CHANNEL); 
+{
+    // ==================================================
+    // INITIALIZE PWM
+    // ==================================================
 
-    // Initialize Motor 2
-    pwm_init(MOTOR_2_GPIO, MOTOR_TIM, MOTOR_2_PIN);
-    pwm_setSignal(MOTOR_TIM, MOTOR_2_CHANNEL, FREQUENCY, duty_cycle2);
+    pwm_init(
+        MOTOR_1_GPIO,
+        MOTOR_TIM,
+        MOTOR_1_PIN
+    );
 
-    // Initialize Motor 3
-    pwm_init(MOTOR_3_GPIO, MOTOR_TIM, MOTOR_3_PIN);
-    pwm_setSignal(MOTOR_TIM, MOTOR_3_CHANNEL, FREQUENCY, duty_cycle3);
+    // ==================================================
+    // ARM ESC
+    // ==================================================
 
-    // Initialize Motor 4
-    pwm_init(MOTOR_4_GPIO, MOTOR_TIM, MOTOR_4_PIN);
-    pwm_setSignal(MOTOR_TIM, MOTOR_4_CHANNEL, FREQUENCY, duty_cycle4);
+    pwm_setSignal(
+        MOTOR_TIM,
+        MOTOR_1_CHANNEL,
+        FREQUENCY,
+        ESC_ARM_DUTY
+    );
 
-    timer_init(DELAY_TIM); 
+    pwm_start(
+        MOTOR_TIM,
+        MOTOR_1_CHANNEL
+    );
+
+    // ==================================================
+    // INITIALIZE DELAY TIMER
+    // ==================================================
+
+    timer_init(DELAY_TIM);
+
+    // Wait for ESC arming
     timer_delay_ms(DELAY_TIM, 3000);
+
+    // ==================================================
+    // START MOTOR SLOWLY
+    // ==================================================
+
+    pwm_setSignal(
+        MOTOR_TIM,
+        MOTOR_1_CHANNEL,
+        FREQUENCY,
+        ESC_SLOW_DUTY
+    );
+
+    // ==================================================
+    // MAIN LOOP
+    // ==================================================
 
     while (1)
     {
-        for (uint8_t duty = ESC_MIN_DUTY; duty <= ESC_MAX_DUTY; duty++)
-        {
-            pwm_setSignal(MOTOR_TIM, MOTOR_1_CHANNEL, FREQUENCY, duty);
-            timer_delay_ms(DELAY_TIM, 500);
-        }
-
-        for (int duty = ESC_MAX_DUTY; duty >= (int)ESC_MIN_DUTY; duty--)
-        {
-            pwm_setSignal(MOTOR_TIM, MOTOR_1_CHANNEL, FREQUENCY, duty);
-            timer_delay_ms(DELAY_TIM, 500);
-        }
+        // Keep motor spinning slowly
+        timer_delay_ms(DELAY_TIM, 1000);
     }
-    return 0;  // Never reached
+
+    return 0;
 }
-
-

@@ -1,115 +1,216 @@
 /**
  * @file PWM.c
- * @brief Implementation of PWM signal generation
- * 
- * This file implements the PWM module functions using the TIM driver.
- * It generates a PWM signal on GPIOA pin 0 using TIM2 channel 1.
- * @authors David Mijares, Ximena Cedillo, Xavier Clemente
- *
+ * @brief PWM Driver for ESC Servo PWM
  */
 
 #include "PWM.h"
 
 /**
- * @brief Initializes the PWM module
- * 
- * This function performs the following steps:
- * 1. Initializes the GPIO subsystem
- * 2. Enables clock for GPIO port A
- * 3. Configures PA0 as alternate function for TIM2
- * 4. Initializes the timer subsystem
- * 5. Enables clock for TIM2
- * 
- * @note The GPIO alternate function configuration includes both the
- *       MODER register (sets alternate function mode) and the AFR
- *       register (selects the specific alternate function)
- * 
- * @warning Must be called before any other PWM functions
- * 
- * @return No return value
+ * @brief Initialize PWM GPIO and Timer
  */
-
 void pwm_init(port_t p, tim_t t, uint8_t pin)
-{   
-    
-    gpio_init(); 
-    gpio_initPort(p); 
-    gpio_setAlternateFunction(p, pin, ALTERNATE_FUNC_TIM2);  // Connect PIN 0 in GPIOA to the TIM2
-    
-    //Initialize timer and set frequency
-    tim_init(); 
-    tim_initTimer(t);
-
-}
-
-/**
- * @brief Configures the PWM signal parameters
- * 
- * This function performs the following steps:
- * 1. Sets the PWM frequency using the timer
- * 2. Configures the channel in PWM mode
- * 3. Calculates the compare value for 50% duty cycle
- * 4. Loads the compare value into the CCR register
- * 
- * @pre pwm_init() must be called before this function
- * @post Timer is configured with the specified frequency and mode
- * 
- * @note The compare value is calculated as 50% of the ARR value
- *       to produce a symmetrical square wave
- * 
- * @return No return value
- */
-
-void pwm_setSignal(tim_t t, channel_t chann, uint32_t frecuency, uint8_t duty_cycle)
 {
-    tim_setTimerFreq(t, frecuency);
-    tim_setTimerCompareMode(t, chann, PWM_MODE);
-    
-    // Calculate compare value based on duty cycle percentage
-    uint16_t compare_value = (TIM[t]->ARR * duty_cycle) / 100;
-    
-    tim_setTimerCompareChannelValue(t, chann, compare_value);
+    gpio_init();
+
+    gpio_initPort(p);
+
+    // Connect GPIO pin to TIM2 AF
+    gpio_setAlternateFunction(p, pin, ALTERNATE_FUNC_TIM2);
+
+    // Initialize timer module
+    tim_init();
+
+    // Enable timer clock
+    tim_initTimer(t);
 }
 
 /**
- * @brief Starts PWM signal generation
- * 
- * This function enables the hardware to start generating the PWM signal:
- * 1. Enables the compare channel output
- * 2. Enables the timer counter
- * 
- * @pre pwm_init() and pwm_setSignal() must be called first
- * @post PWM signal is active on the configured GPIO pin
- * 
- * @note Once started, the PWM runs in hardware and does not require
- *       CPU intervention until stopped
- * 
- * @return No return value
+ * @brief Configure PWM signal for ESC Servo PWM
+ *
+ * ESC expects:
+ * 50 Hz
+ * 1000 us -> minimum throttle
+ * 2000 us -> maximum throttle
+ *
+ * Duty mapping:
+ * 5  -> 1000 us
+ * 10 -> 2000 us
  */
+void pwm_setSignal(
+    tim_t t,
+    channel_t chann,
+    uint32_t frecuency,
+    uint8_t duty_cycle
+)
+{
+    (void)frecuency;
 
+    // =========================================
+    // STOP TIMER
+    // =========================================
+
+    TIM[t]->CR1 &= ~(1U << 0);
+
+    // =========================================
+    // TIMER CONFIGURATION
+    // =========================================
+    //
+    // Timer Clock = 16 MHz
+    //
+    // PSC = 15
+    // Tick = 1 us
+    //
+    // ARR = 19999
+    // Period = 20 ms
+    // Frequency = 50 Hz
+    //
+    // =========================================
+
+    TIM[t]->PSC = 15;
+
+    TIM[t]->ARR = 20000 - 1;
+
+    // =========================================
+    // DUTY TO MICROSECONDS
+    // =========================================
+
+    uint16_t pulse_us;
+
+    if (duty_cycle <= 5)
+    {
+        pulse_us = 1000;
+    }
+    else if (duty_cycle >= 10)
+    {
+        pulse_us = 2000;
+    }
+    else
+    {
+        pulse_us =
+            1000 +
+            ((duty_cycle - 5) * 1000) / 5;
+    }
+
+    // =========================================
+    // PWM MODE 1 CONFIGURATION
+    // =========================================
+
+    switch (chann)
+    {
+        case channel_1:
+
+            // Clear OC1M bits
+            TIM[t]->CCMR1 &= ~(7U << 4);
+
+            // PWM Mode 1
+            TIM[t]->CCMR1 |= (6U << 4);
+
+            // Enable preload
+            TIM[t]->CCMR1 |= (1U << 3);
+
+            // Compare value
+            TIM[t]->CCR1 = pulse_us;
+
+            // Enable output
+            TIM[t]->CCER |= (1U << 0);
+
+            break;
+
+        case channel_2:
+
+            TIM[t]->CCMR1 &= ~(7U << 12);
+
+            TIM[t]->CCMR1 |= (6U << 12);
+
+            TIM[t]->CCMR1 |= (1U << 11);
+
+            TIM[t]->CCR2 = pulse_us;
+
+            TIM[t]->CCER |= (1U << 4);
+
+            break;
+
+        case channel_3:
+
+            TIM[t]->CCMR2 &= ~(7U << 4);
+
+            TIM[t]->CCMR2 |= (6U << 4);
+
+            TIM[t]->CCMR2 |= (1U << 3);
+
+            TIM[t]->CCR3 = pulse_us;
+
+            TIM[t]->CCER |= (1U << 8);
+
+            break;
+
+        case channel_4:
+
+            TIM[t]->CCMR2 &= ~(7U << 12);
+
+            TIM[t]->CCMR2 |= (6U << 12);
+
+            TIM[t]->CCMR2 |= (1U << 11);
+
+            TIM[t]->CCR4 = pulse_us;
+
+            TIM[t]->CCER |= (1U << 12);
+
+            break;
+
+        default:
+            return;
+    }
+
+    // Enable ARR preload
+    TIM[t]->CR1 |= (1U << 7);
+
+    // Generate update event
+    TIM[t]->EGR |= (1U << 0);
+
+    // Enable timer
+    TIM[t]->CR1 |= (1U << 0);
+}
+
+/**
+ * @brief Start PWM output
+ *
+ * Timer and channel already enabled
+ * in pwm_setSignal()
+ */
 void pwm_start(tim_t t, channel_t chann)
 {
-    tim_enableTimerCompareChannel(t, chann); 
-    tim_enableTimer(t); 
+    (void)t;
+    (void)chann;
 }
 
 /**
- * @brief Stops PWM signal generation
- * 
- * This function halts the PWM output:
- * 1. Disables the compare channel output
- * 2. Stops the timer counter
- * 
- * @pre PWM must be previously started
- * @post PWM signal is stopped and GPIO pin returns to high impedance state
- * 
- * @warning Calling this function stops all channels on the same timer
- * 
- * @return No return value
+ * @brief Stop PWM output
  */
-
 void pwm_stop(tim_t t, channel_t chann)
 {
-    tim_disableTimerCompareChannel(t, chann); 
-    tim_disableTimer(t); 
+    switch (chann)
+    {
+        case channel_1:
+            TIM[t]->CCER &= ~(1U << 0);
+            break;
+
+        case channel_2:
+            TIM[t]->CCER &= ~(1U << 4);
+            break;
+
+        case channel_3:
+            TIM[t]->CCER &= ~(1U << 8);
+            break;
+
+        case channel_4:
+            TIM[t]->CCER &= ~(1U << 12);
+            break;
+
+        default:
+            return;
+    }
+
+    // Disable timer
+    TIM[t]->CR1 &= ~(1U << 0);
 }
