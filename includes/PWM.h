@@ -5,21 +5,24 @@
  * @file PWM.h
  * @brief PWM Driver for ESC Servo PWM Control
  *
- * This module provides the necessary functions to generate
- * PWM signals using STM32 hardware timers.
+ * This module provides the necessary functions
+ * to generate PWM signals using STM32 timers.
  *
- * The driver is specifically configured for ESC Servo PWM:
+ * The driver is configured specifically for
+ * ESC Servo PWM control.
  *
- *  - Frequency: 50 Hz
- *  - Pulse range:
+ * PWM configuration:
+ *
+ *  Frequency:
+ *      50 Hz
+ *
+ *  Pulse Width:
  *      1000 us -> minimum throttle
  *      2000 us -> maximum throttle
  *
- * The PWM signal is generated using the STM32 timer
- * compare channels in PWM Mode 1.
- *
  * This module allows:
- *  - GPIO alternate function initialization
+ *
+ *  - GPIO alternate function configuration
  *  - Timer initialization
  *  - PWM signal configuration
  *  - PWM output enable/disable
@@ -48,29 +51,20 @@
 // ======================================================
 
 /**
- * @brief Alternate Function number for TIM2
+ * @brief TIM2 Alternate Function number
  *
- * AF1 connects the GPIO pin to the TIM2 peripheral.
- *
- * Example:
- *  PA0 -> TIM2_CH1
- *  PA1 -> TIM2_CH2
+ * AF1 connects the GPIO pin to TIM2.
  */
 #define ALTERNATE_FUNC_TIM2 1
 
 /**
- * @brief PWM Mode 1 configuration value
+ * @brief PWM Mode 1 value
  *
- * PWM Mode 1 behavior:
+ * Output HIGH when:
+ *      CNT < CCRx
  *
- * Output HIGH:
- *  when CNT < CCRx
- *
- * Output LOW:
- *  when CNT >= CCRx
- *
- * This is the standard PWM mode used
- * for ESC servo control.
+ * Output LOW when:
+ *      CNT >= CCRx
  */
 #define PWM_MODE 6
 
@@ -81,41 +75,23 @@
 /**
  * @brief PWM timer channels
  *
- * Each STM32 timer contains up to 4
- * capture/compare channels.
- *
- * These channels correspond to:
- *
- *  CCR1
- *  CCR2
- *  CCR3
- *  CCR4
+ * Each timer has up to 4 compare channels.
  */
 typedef enum pwm_channel
 {
-    /**
-     * @brief Timer Channel 1
-     */
+    // Timer Compare Channel 1
     channel_1 = 1,
 
-    /**
-     * @brief Timer Channel 2
-     */
+    // Timer Compare Channel 2
     channel_2 = 2,
 
-    /**
-     * @brief Timer Channel 3
-     */
+    // Timer Compare Channel 3
     channel_3 = 3,
 
-    /**
-     * @brief Timer Channel 4
-     */
+    // Timer Compare Channel 4
     channel_4 = 4,
 
-    /**
-     * @brief Number of channels
-     */
+    // Number of channels
     SIZE = 5
 
 } channel_t;
@@ -125,22 +101,16 @@ typedef enum pwm_channel
 // ======================================================
 
 /**
- * @brief Initializes the PWM module
+ * @brief Initialize PWM module
  *
- * This function performs the following steps:
+ * This function:
  *
- * 1. Initializes the GPIO subsystem
- * 2. Enables the selected GPIO port
- * 3. Configures the GPIO pin as Alternate Function
- * 4. Connects the GPIO pin to TIM2
- * 5. Initializes the timer subsystem
- * 6. Enables the selected timer
- *
- * @pre
- * None
- *
- * @post
- * GPIO and Timer are configured for PWM operation
+ * 1. Initializes GPIO subsystem
+ * 2. Enables selected GPIO port
+ * 3. Configures GPIO pin as Alternate Function
+ * 4. Connects pin to TIM2
+ * 5. Initializes timer subsystem
+ * 6. Enables selected timer
  *
  * @param p
  * GPIO port
@@ -154,42 +124,23 @@ typedef enum pwm_channel
  * @return
  * No return value
  */
-void pwm_init(
-    port_t p,
-    tim_t t,
-    uint8_t pin
-);
+void pwm_init(port_t p, tim_t t, uint8_t pin);
 
 /**
- * @brief Configures the PWM signal
+ * @brief Configure PWM signal
  *
  * This function configures:
  *
  *  - Timer prescaler
- *  - Timer auto-reload register
- *  - PWM mode
- *  - Compare value
+ *  - Auto-reload register
+ *  - PWM Mode 1
+ *  - Compare register value
  *  - PWM output channel
  *
- * The PWM signal is configured for:
- *
- *  Frequency:
- *      50 Hz
- *
- *  Servo Pulse Width:
- *      1000 us -> minimum throttle
- *      2000 us -> maximum throttle
- *
- * Duty cycle mapping:
+ * ESC PWM mapping:
  *
  *      5  -> 1000 us
  *      10 -> 2000 us
- *
- * @pre
- * pwm_init() must be called first
- *
- * @post
- * PWM signal is fully configured
  *
  * @param t
  * Timer module
@@ -201,30 +152,17 @@ void pwm_init(
  * PWM frequency
  *
  * @param duty_cycle
- * Duty cycle percentage
+ * PWM duty cycle
  *
  * @return
  * No return value
  */
-void pwm_setSignal(
-    tim_t t,
-    channel_t chann,
-    uint32_t frecuency,
-    uint8_t duty_cycle
-);
+void pwm_setSignal(tim_t t, channel_t chann, uint32_t frecuency, uint8_t duty_cycle);
 
 /**
- * @brief Starts PWM generation
+ * @brief Start PWM signal generation
  *
- * This function enables the PWM signal
- * generation on the configured timer channel.
- *
- * @pre
- * pwm_init() and pwm_setSignal()
- * must be called first
- *
- * @post
- * PWM signal becomes active
+ * Enables PWM output on selected channel.
  *
  * @param t
  * Timer module
@@ -235,25 +173,16 @@ void pwm_setSignal(
  * @return
  * No return value
  */
-void pwm_start(
-    tim_t t,
-    channel_t chann
-);
+void pwm_start(tim_t t, channel_t chann);
 
 /**
- * @brief Stops PWM generation
+ * @brief Stop PWM signal generation
  *
- * This function disables:
+ * Disables:
  *
  *  - PWM output channel
  *  - Timer counter
  *
- * @pre
- * PWM must already be active
- *
- * @post
- * PWM signal is disabled
- *
  * @param t
  * Timer module
  *
@@ -263,9 +192,6 @@ void pwm_start(
  * @return
  * No return value
  */
-void pwm_stop(
-    tim_t t,
-    channel_t chann
-);
+void pwm_stop(tim_t t, channel_t chann);
 
 #endif
