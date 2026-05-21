@@ -105,6 +105,9 @@ int main(void)
 
     // Configure PA0 as PWM output
     pwm_init(MOTOR_1_GPIO, MOTOR_TIM, MOTOR_1_PIN);
+    pwm_init(MOTOR_2_GPIO, MOTOR_TIM, MOTOR_2_PIN);
+    pwm_init(MOTOR_3_GPIO, MOTOR_TIM, MOTOR_3_PIN);
+    pwm_init(MOTOR_4_GPIO, MOTOR_TIM, MOTOR_4_PIN);
 
     // ==================================================
     // ARM ESC
@@ -112,9 +115,15 @@ int main(void)
 
     // Send minimum throttle signal
     pwm_setSignal(MOTOR_TIM, MOTOR_1_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
+    pwm_setSignal(MOTOR_TIM, MOTOR_2_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
+    pwm_setSignal(MOTOR_TIM, MOTOR_3_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
+    pwm_setSignal(MOTOR_TIM, MOTOR_4_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
 
     // Start PWM generation
     pwm_start(MOTOR_TIM, MOTOR_1_CHANNEL);
+    pwm_start(MOTOR_TIM, MOTOR_2_CHANNEL);
+    pwm_start(MOTOR_TIM, MOTOR_3_CHANNEL);
+    pwm_start(MOTOR_TIM, MOTOR_4_CHANNEL);
 
     // ==================================================
     // INITIALIZE DELAY TIMER
@@ -130,9 +139,10 @@ int main(void)
     // START MOTOR
     // ==================================================
 
-    // Send low throttle signal
-    // so the motor spins slowly
     pwm_setSignal(MOTOR_TIM, MOTOR_1_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
+    pwm_setSignal(MOTOR_TIM, MOTOR_2_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
+    pwm_setSignal(MOTOR_TIM, MOTOR_3_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
+    pwm_setSignal(MOTOR_TIM, MOTOR_4_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
 
     // ==================================================
     // MAIN LOOP

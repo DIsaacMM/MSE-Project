@@ -17,6 +17,11 @@
 #include <stdint.h>
 #include "stm32f4xx.h" 
 
+#define SYSCFG_EXTI_REG_NUM_LINES 4
+#define GPIO_EXTI_RISING_TRIGGER 1
+#define GPIO_EXTI_FALLING_TRIGGER 1
+
+
 typedef enum port
  {
     A, 

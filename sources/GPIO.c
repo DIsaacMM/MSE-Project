@@ -258,3 +258,43 @@ void gpio_setAlternateFunction(port_t p, uint8_t pin, uint8_t alternate_mode)
         gpio[p]->AFR[1] |= (alternate_mode << ((pin - 8) * 4));
     }
 }
+
+void gpio_exit_init()
+{
+    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN; 
+}
+
+// void gpio_exit_pinConfig(uint8_t port, uint8_t pin, uint8_t trigger)
+// {
+//     __disable_irq(); 
+
+//     uint8_t regIndex = (pin / SYSCFG_EXTI_REG_NUM_LINES); 
+//     uint8_t regOffset = (pin % SYSCFG_EXTI_REG_NUM_LINES); 
+
+//     SYSCFG->EXTICR[regIndex] |= (port << (SYSCFG_EXTI_REG_NUM_LINES * regOffset)); 
+
+//     EXTI->IMR |= (EXTI_BIT << pin); 
+
+//     if(GPIO_EXTI_RISING_TRIGGER == trigger)
+//     {
+//         EXTI->RTSR |= (EXTI_BIT << pin); 
+//     }
+
+//     if(GPIO_EXTI_FALLING_TRIGGER == trigger)
+//     {
+//         EXTI->FTSR |= (EXTI_BIT << pin); 
+//     }
+
+//     NVIC_EnableIRQ(gpioExtiIrqList[pin]); 
+// }
+
+
+// void EXTI15_10_IRQHandler()
+// {
+//     if(EXTI->PR & EXTI_PR_PR13)
+//     {
+//         EXTI->PR |= EXTI_PR_PR13; 
+
+//         gpio_togglePin(A, )
+//     }
+// }
