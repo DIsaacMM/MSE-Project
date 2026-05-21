@@ -55,7 +55,6 @@
  *
  * AF1 connects the GPIO pin to TIM2.
  */
-#define ALTERNATE_FUNC_TIM2 1
 
 /**
  * @brief PWM Mode 1 value

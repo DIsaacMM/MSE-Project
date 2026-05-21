@@ -57,13 +57,51 @@ void pwm_init(port_t p, tim_t t, uint8_t pin)
     // Initialize GPIO subsystem
     gpio_init();
 
-    // Enable GPIO port clock
+    // Enable selected GPIO port
     gpio_initPort(p);
 
-    // Connect GPIO pin to TIM2 Alternate Function
-    gpio_setAlternateFunction(p, pin, ALTERNATE_FUNC_TIM2);
+    // Variable that stores the Alternate Function value
+    uint8_t af = 0;
 
-    // Initialize timer subsystem
+    // =========================================
+    // SELECT ALTERNATE FUNCTION
+    // =========================================
+
+    // TIM1 and TIM2 use AF1
+    if(t == TIM_1 || t == TIM_2)
+    {
+        af = 1;
+    }
+
+    // TIM3, TIM4 and TIM5 use AF2
+    else if(t == TIM_3 || t == TIM_4 || t == TIM_5)
+    {
+        af = 2;
+    }
+
+    // TIM8, TIM9, TIM10 and TIM11 use AF3
+    else if(t == TIM_9  || t == TIM_10 || t == TIM_11)
+    {
+        af = 3;
+    }
+
+
+    // Invalid timer
+    else
+    {
+        return;
+    }
+
+    // =========================================
+    // CONFIGURE GPIO ALTERNATE FUNCTION
+    // =========================================
+
+    gpio_setAlternateFunction(p, pin, af);
+
+    // =========================================
+    // INITIALIZE TIMER
+    // =========================================
+
     tim_init();
 
     // Enable selected timer

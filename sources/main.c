@@ -1,6 +1,6 @@
 ﻿/**
  * @file main.c
- * @brief ESC PWM test for Motor 1
+ * @brief ESC PWM test for 4 Motors
  *
  * This program generates a PWM signal using TIM2
  * to control a brushless ESC in Servo PWM mode.
@@ -19,13 +19,16 @@
 #include "PWM.h"
 #include "Sensor.h"
 #include "Timer.h"
+#include "Drone.h"
 
 // ======================================================
 // TIMER CONFIGURATION
 // ======================================================
 
 // Timer used for PWM generation
-#define MOTOR_TIM TIM_2
+#define MOTOR_TIM2 TIM_2
+#define MOTOR_TIM4 TIM_4
+
 
 // Timer used for delays
 #define DELAY_TIM TIM_3
@@ -53,17 +56,17 @@
 // MOTOR 3 CONFIGURATION
 // ======================================================
 
-#define MOTOR_3_PIN 2
-#define MOTOR_3_GPIO A
-#define MOTOR_3_CHANNEL channel_3
+#define MOTOR_3_PIN 6
+#define MOTOR_3_GPIO B
+#define MOTOR_3_CHANNEL channel_1
 
 // ======================================================
 // MOTOR 4 CONFIGURATION
 // ======================================================
 
-#define MOTOR_4_PIN 3
-#define MOTOR_4_GPIO A
-#define MOTOR_4_CHANNEL channel_4
+#define MOTOR_4_PIN 7
+#define MOTOR_4_GPIO B
+#define MOTOR_4_CHANNEL channel_2
 
 // ======================================================
 // ESC CONFIGURATION
@@ -102,28 +105,28 @@ int main(void)
     // ==================================================
     // INITIALIZE PWM
     // ==================================================
-
+    
     // Configure PA0 as PWM output
-    pwm_init(MOTOR_1_GPIO, MOTOR_TIM, MOTOR_1_PIN);
-    pwm_init(MOTOR_2_GPIO, MOTOR_TIM, MOTOR_2_PIN);
-    pwm_init(MOTOR_3_GPIO, MOTOR_TIM, MOTOR_3_PIN);
-    pwm_init(MOTOR_4_GPIO, MOTOR_TIM, MOTOR_4_PIN);
+    pwm_init(MOTOR_1_GPIO, MOTOR_TIM2, MOTOR_1_PIN);
+    pwm_init(MOTOR_2_GPIO, MOTOR_TIM2, MOTOR_2_PIN);
+    pwm_init(MOTOR_3_GPIO, MOTOR_TIM4, MOTOR_3_PIN);
+    pwm_init(MOTOR_4_GPIO, MOTOR_TIM4, MOTOR_4_PIN);
 
     // ==================================================
     // ARM ESC
     // ==================================================
 
     // Send minimum throttle signal
-    pwm_setSignal(MOTOR_TIM, MOTOR_1_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
-    pwm_setSignal(MOTOR_TIM, MOTOR_2_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
-    pwm_setSignal(MOTOR_TIM, MOTOR_3_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
-    pwm_setSignal(MOTOR_TIM, MOTOR_4_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
+    pwm_setSignal(MOTOR_TIM2, MOTOR_1_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
+    pwm_setSignal(MOTOR_TIM2, MOTOR_2_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
+    pwm_setSignal(MOTOR_TIM4, MOTOR_3_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
+    pwm_setSignal(MOTOR_TIM4, MOTOR_4_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
 
     // Start PWM generation
-    pwm_start(MOTOR_TIM, MOTOR_1_CHANNEL);
-    pwm_start(MOTOR_TIM, MOTOR_2_CHANNEL);
-    pwm_start(MOTOR_TIM, MOTOR_3_CHANNEL);
-    pwm_start(MOTOR_TIM, MOTOR_4_CHANNEL);
+    pwm_start(MOTOR_TIM2, MOTOR_1_CHANNEL);
+    pwm_start(MOTOR_TIM2, MOTOR_2_CHANNEL);
+    pwm_start(MOTOR_TIM4, MOTOR_3_CHANNEL);
+    pwm_start(MOTOR_TIM4, MOTOR_4_CHANNEL);
 
     // ==================================================
     // INITIALIZE DELAY TIMER
@@ -139,10 +142,10 @@ int main(void)
     // START MOTOR
     // ==================================================
 
-    pwm_setSignal(MOTOR_TIM, MOTOR_1_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
-    pwm_setSignal(MOTOR_TIM, MOTOR_2_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
-    pwm_setSignal(MOTOR_TIM, MOTOR_3_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
-    pwm_setSignal(MOTOR_TIM, MOTOR_4_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
+    pwm_setSignal(MOTOR_TIM2, MOTOR_1_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
+    pwm_setSignal(MOTOR_TIM2, MOTOR_2_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
+    pwm_setSignal(MOTOR_TIM4, MOTOR_3_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
+    pwm_setSignal(MOTOR_TIM4, MOTOR_4_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
 
     // ==================================================
     // MAIN LOOP
