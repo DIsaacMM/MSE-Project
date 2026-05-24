@@ -6,7 +6,7 @@
  * functions for the MPU6050 sensor. It relies on the low-level I2C driver (I2C.c)
  * for all I2C transactions. No interrupts or timeouts are used (blocking mode).
  *
- * @authors David Mijares, Ximena Cedillo, Xavier Clemente
+ * @authors David Mijares
  */
 
 #include "MPU6050.h"   // Contains MPU6050 address, register definitions, and MPU6050_t struct

@@ -74,17 +74,12 @@
 
 // Minimum throttle
 // 5 -> 1000 us
-#define ESC_MIN_DUTY 5
+#define ESC_MIN_US 1000
 
 // Maximum throttle
 // 10 -> 2000 us
-#define ESC_MAX_DUTY 10
+#define ESC_MAX_US 2000
 
-// ESC arming throttle
-#define ESC_ARM_DUTY 5
-
-// Low throttle for slow motor spin
-#define ESC_TEST_DUTY 6
 
 /**
  * @brief Main program
@@ -100,7 +95,9 @@
  * @return
  * Never returns
  */
-int main(void)
+
+
+ int main(void)
 {
     // ==================================================
     // INITIALIZE PWM
@@ -117,10 +114,10 @@ int main(void)
     // ==================================================
 
     // Send minimum throttle signal
-    pwm_setSignal(MOTOR_TIM2, MOTOR_1_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
-    pwm_setSignal(MOTOR_TIM2, MOTOR_2_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
-    pwm_setSignal(MOTOR_TIM4, MOTOR_3_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
-    pwm_setSignal(MOTOR_TIM4, MOTOR_4_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
+    pwm_setSignal(MOTOR_TIM2, MOTOR_1_CHANNEL, FREQUENCY, ESC_MIN_US);
+    pwm_setSignal(MOTOR_TIM2, MOTOR_2_CHANNEL, FREQUENCY, ESC_MIN_US);
+    pwm_setSignal(MOTOR_TIM4, MOTOR_3_CHANNEL, FREQUENCY, ESC_MIN_US);
+    pwm_setSignal(MOTOR_TIM4, MOTOR_4_CHANNEL, FREQUENCY, ESC_MIN_US);
 
     // Start PWM generation
     pwm_start(MOTOR_TIM2, MOTOR_1_CHANNEL);
@@ -138,14 +135,6 @@ int main(void)
     // Wait for ESC startup
     timer_delay_ms(DELAY_TIM, 3000);
 
-    // ==================================================
-    // START MOTOR
-    // ==================================================
-
-    pwm_setSignal(MOTOR_TIM2, MOTOR_1_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
-    pwm_setSignal(MOTOR_TIM2, MOTOR_2_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
-    pwm_setSignal(MOTOR_TIM4, MOTOR_3_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
-    pwm_setSignal(MOTOR_TIM4, MOTOR_4_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
 
     // ==================================================
     // MAIN LOOP
@@ -153,9 +142,30 @@ int main(void)
 
     while (1)
     {
-        // Delay for 1 second
-        timer_delay_ms(DELAY_TIM, 1000);
+        for(uint16_t i = ESC_MIN_US; i < 1100; i++)
+        {
+            pwm_setSignal(MOTOR_TIM2, MOTOR_1_CHANNEL, FREQUENCY, i);
+            pwm_setSignal(MOTOR_TIM2, MOTOR_2_CHANNEL, FREQUENCY, i);
+            pwm_setSignal(MOTOR_TIM4, MOTOR_3_CHANNEL, FREQUENCY, i);
+            pwm_setSignal(MOTOR_TIM4, MOTOR_4_CHANNEL, FREQUENCY, i);
+            timer_delay_ms(DELAY_TIM, 20);
+        }
+
+        for(uint16_t i = 1000; i > 1000; i--)
+        {
+            pwm_setSignal(MOTOR_TIM2, MOTOR_1_CHANNEL, FREQUENCY, i);
+            pwm_setSignal(MOTOR_TIM2, MOTOR_2_CHANNEL, FREQUENCY, i);
+            pwm_setSignal(MOTOR_TIM4, MOTOR_3_CHANNEL, FREQUENCY, i);
+            pwm_setSignal(MOTOR_TIM4, MOTOR_4_CHANNEL, FREQUENCY, i);
+            timer_delay_ms(DELAY_TIM, 20);
+        }
+
+        while (1)
+        {
+            timer_delay_ms(DELAY_TIM, 1000);
+        }        
     }
 
     return 0;
 }
+

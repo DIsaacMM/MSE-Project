@@ -156,8 +156,8 @@ void pwm_init(port_t p, tim_t t, uint8_t pin);
  * @return
  * No return value
  */
-void pwm_setSignal(tim_t t, channel_t chann, uint32_t frecuency, uint8_t duty_cycle);
 
+void pwm_setSignal(tim_t t, channel_t chann, uint32_t frecuency, uint16_t pulse_us);
 /**
  * @brief Start PWM signal generation
  *
@@ -192,5 +192,12 @@ void pwm_start(tim_t t, channel_t chann);
  * No return value
  */
 void pwm_stop(tim_t t, channel_t chann);
+
+
+
+
+
+
+
 
 #endif
