@@ -24,7 +24,7 @@
  * Example: #define SLC_FREQ 100000
  */
 
-#define SLC_FREQ 100000    // Default to 100 kHz 
+#define SLC_FREQ 400000    // fast mode for i2c (400 kHz) 
 
 
 /**

@@ -6,9 +6,8 @@
 #include "Sensor.h"
 #include "Timer.h"
 
-
 typedef void (*motor_init_t)(port_t, tim_t, uint8_t);     
-typedef void (*motor_setSignal_t)(tim_t, channel_t, uint32_t, uint16_t);    
+typedef void (*motor_setSignal_t)(tim_t, channel_t, uint32_t, uint16_t);   
 typedef void (*motor_start_t)(tim_t, channel_t); 
 typedef void (*motor_stop_t)(tim_t, channel_t); 
 typedef struct motor
@@ -32,6 +31,6 @@ extern motor_t m2;
 extern motor_t m3; 
 extern motor_t m4; 
 
-void drone_init();
+void drone_init(uint32_t freq, uint8_t esc_min_duty);
 
 #endif 

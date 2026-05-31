@@ -39,7 +39,7 @@ $(ARCHFLAGS)
 
 # Linker Flags
 LDFLAGS = 		\
--nostdlib 		\
+-nostartfiles -nostdlib 		\
 -T 				\
 $(LINKER_FILE)	\
 

@@ -74,15 +74,21 @@ void i2c_init(void)
     // Enable I2C1 Clock (APB1ENR bit 21)
     RCC->APB1ENR |= RCC_APB1ENR_I2C1EN;
 
-    // Default state: clear control registers
-    I2C1->CR1 = 0;
+    // Software reset — limpia cualquier estado colgado del bus
+    I2C1->CR1 |=  I2C_CR1_SWRST;
+    I2C1->CR1 &= ~I2C_CR1_SWRST;
+
+    // CR2: FREQ = frecuencia APB1 en MHz (bits [5:0]) — OBLIGATORIO
+    // Sin esto CCR y TRISE no funcionan correctamente
+    // STM32F411RE Nucleo @ 16MHz HSI → FREQ = 16
     I2C1->CR2 = 0;
+    I2C1->CR2 |= (16U & 0x3F);
 
     // Set clock speed and rise time
     I2C1->CCR   = i2c_calc_ccr(SLC_FREQ);
     I2C1->TRISE = i2c_trise(SLC_FREQ);
 
-    // Disable all interrupts (ITEVTEN, ITBUFEN, ITERREN)
+    // Disable all interrupts
     I2C1->CR2 &= ~(I2C_CR2_ITEVTEN | I2C_CR2_ITBUFEN | I2C_CR2_ITERREN);
 
     // Enable the I2C peripheral
@@ -106,41 +112,33 @@ void i2c_init(void)
  *
  * @note This function is blocking and does not implement timeouts or error handling.
  */
+#define I2C_TIMEOUT 10000U
+#define I2C_WAIT(cond) do {     volatile uint32_t _t = 0;     while(!(cond) && _t < I2C_TIMEOUT) _t++;     if (_t >= I2C_TIMEOUT) { I2C1->CR1 |= I2C_CR1_STOP; return; } } while(0)
+
 void i2c_writeRegDevice(uint8_t device_address, uint8_t register_address, uint8_t *data, uint32_t len)
 {
-    while (I2C1->SR2 & I2C_SR2_BUSY);
+    for (volatile uint32_t t = 0; (I2C1->SR2 & I2C_SR2_BUSY) && t < I2C_TIMEOUT; t++);
+    if (I2C1->SR2 & I2C_SR2_BUSY) return;
 
-    // START
     I2C1->CR1 |= I2C_CR1_START;
+    I2C_WAIT(I2C1->SR1 & I2C_SR1_SB);
 
-    while (!(I2C1->SR1 & I2C_SR1_SB));
-
-    // ADDRESS + WRITE
     I2C1->DR = (device_address << 1);
+    I2C_WAIT(I2C1->SR1 & I2C_SR1_ADDR);
 
-    while (!(I2C1->SR1 & I2C_SR1_ADDR));
-
-    // CLEAR ADDR
     (void)I2C1->SR1;
     (void)I2C1->SR2;
 
-    // REGISTER
     I2C1->DR = register_address;
+    I2C_WAIT(I2C1->SR1 & I2C_SR1_TXE);
 
-    while (!(I2C1->SR1 & I2C_SR1_TXE));
-
-    // DATA
     for(uint32_t i = 0; i < len; i++)
     {
         I2C1->DR = data[i];
-
-        while (!(I2C1->SR1 & I2C_SR1_TXE));
+        I2C_WAIT(I2C1->SR1 & I2C_SR1_TXE);
     }
 
-    // WAIT BTF
-    while (!(I2C1->SR1 & I2C_SR1_BTF));
-
-    // STOP
+    I2C_WAIT(I2C1->SR1 & I2C_SR1_BTF);
     I2C1->CR1 |= I2C_CR1_STOP;
 }
 
@@ -161,10 +159,10 @@ void i2c_writeRegDevice(uint8_t device_address, uint8_t register_address, uint8_
 void i2c_writeDevice(uint8_t device_address, uint8_t *data, uint32_t len)
 {
     I2C1->CR1 |= I2C_CR1_START;                     // Generate START
-    while (!(I2C1->SR1 & I2C_SR1_SB));              // Wait for START sent
+    I2C_WAIT(I2C1->SR1 & I2C_SR1_SB);              // Wait for START sent
 
     I2C1->DR = (device_address << 1);               // Send address + write bit
-    while (!(I2C1->SR1 & I2C_SR1_ADDR));            // Wait for address acknowledged
+    I2C_WAIT(I2C1->SR1 & I2C_SR1_ADDR);            // Wait for address acknowledged
 
     // Clear ADDR flag
     (void)I2C1->SR1;
@@ -173,7 +171,7 @@ void i2c_writeDevice(uint8_t device_address, uint8_t *data, uint32_t len)
     for (uint32_t i = 0; i < len; i++)
     {
         I2C1->DR = data[i];                         // Send data byte
-        while (!(I2C1->SR1 & I2C_SR1_TXE));         // Wait for TX buffer empty
+        I2C_WAIT(I2C1->SR1 & I2C_SR1_TXE);         // Wait for TX buffer empty
     }
 
     I2C1->CR1 |= I2C_CR1_STOP;                      // Generate STOP
@@ -201,17 +199,19 @@ void i2c_writeDevice(uint8_t device_address, uint8_t *data, uint32_t len)
 void i2c_readRegDevice(uint8_t device_address, uint8_t register_address, uint8_t *data, uint32_t len)
 {
     // WAIT BUSY
-    while (I2C1->SR2 & I2C_SR2_BUSY);
+    /* Timeout: si el bus sigue ocupado despues de ~5000 ciclos, salir */
+    for (volatile uint32_t t = 0; (I2C1->SR2 & I2C_SR2_BUSY) && t < 5000; t++);
+    if (I2C1->SR2 & I2C_SR2_BUSY) return;
 
     // START
     I2C1->CR1 |= I2C_CR1_START;
 
-    while (!(I2C1->SR1 & I2C_SR1_SB));
+    I2C_WAIT(I2C1->SR1 & I2C_SR1_SB);
 
     // WRITE ADDRESS
     I2C1->DR = (device_address << 1);
 
-    while (!(I2C1->SR1 & I2C_SR1_ADDR));
+    I2C_WAIT(I2C1->SR1 & I2C_SR1_ADDR);
 
     (void)I2C1->SR1;
     (void)I2C1->SR2;
@@ -219,17 +219,17 @@ void i2c_readRegDevice(uint8_t device_address, uint8_t register_address, uint8_t
     // REGISTER ADDRESS
     I2C1->DR = register_address;
 
-    while (!(I2C1->SR1 & I2C_SR1_TXE));
+    I2C_WAIT(I2C1->SR1 & I2C_SR1_TXE);
 
     // REPEATED START
     I2C1->CR1 |= I2C_CR1_START;
 
-    while (!(I2C1->SR1 & I2C_SR1_SB));
+    I2C_WAIT(I2C1->SR1 & I2C_SR1_SB);
 
     // READ ADDRESS
     I2C1->DR = (device_address << 1) | 1;
 
-    while (!(I2C1->SR1 & I2C_SR1_ADDR));
+    I2C_WAIT(I2C1->SR1 & I2C_SR1_ADDR);
 
     // ENABLE ACK
     I2C1->CR1 |= I2C_CR1_ACK;
@@ -246,7 +246,7 @@ void i2c_readRegDevice(uint8_t device_address, uint8_t register_address, uint8_t
             I2C1->CR1 |= I2C_CR1_STOP;
         }
 
-        while (!(I2C1->SR1 & I2C_SR1_RXNE));
+        I2C_WAIT(I2C1->SR1 & I2C_SR1_RXNE);
 
         data[i] = I2C1->DR;
     }
@@ -273,19 +273,19 @@ void i2c_readDevice(uint8_t device_address, uint8_t *data, uint32_t len)
 {
     // Dummy write phase (some devices need this to set read mode)
     I2C1->CR1 |= I2C_CR1_START;
-    while (!(I2C1->SR1 & I2C_SR1_SB));
+    I2C_WAIT(I2C1->SR1 & I2C_SR1_SB);
 
     I2C1->DR = (device_address << 1);               // Write address
-    while (!(I2C1->SR1 & I2C_SR1_ADDR));
+    I2C_WAIT(I2C1->SR1 & I2C_SR1_ADDR);
     (void)I2C1->SR1;
     (void)I2C1->SR2;
 
     // Repeated start and read
     I2C1->CR1 |= I2C_CR1_START;                     // Repeated START
-    while (!(I2C1->SR1 & I2C_SR1_SB));
+    I2C_WAIT(I2C1->SR1 & I2C_SR1_SB);
 
     I2C1->DR = (device_address << 1) | 1;           // Read address
-    while (!(I2C1->SR1 & I2C_SR1_ADDR));
+    I2C_WAIT(I2C1->SR1 & I2C_SR1_ADDR);
     (void)I2C1->SR1;
     (void)I2C1->SR2;
 
@@ -298,7 +298,7 @@ void i2c_readDevice(uint8_t device_address, uint8_t *data, uint32_t len)
             I2C1->CR1 &= ~I2C_CR1_ACK;              // NACK
             I2C1->CR1 |= I2C_CR1_STOP;              // STOP before reading
         }
-        while (!(I2C1->SR1 & I2C_SR1_RXNE));
+        I2C_WAIT(I2C1->SR1 & I2C_SR1_RXNE);
         data[i] = I2C1->DR;
     }
 }
