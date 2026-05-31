@@ -1,22 +1,26 @@
 SRC_DIR = sources
-INCLUDE_DIR = includes
-CMSIS_CORE_DIR = CMSIS/Core/include
-CMSIS_STM32_DIR = CMSIS/STM32F4xx/include
+INC_DIR = includes
 
-SRC = 						\
-$(SRC_DIR)/main.c			\
-$(SRC_DIR)/GPIO.c			\
-$(SRC_DIR)/PWM.c			\
-$(SRC_DIR)/TIM.c			\
-$(SRC_DIR)/Timer.c			\
-$(SRC_DIR)/ADC.c			\
-$(SRC_DIR)/Sensor.c		\
-$(SRC_DIR)/STM32_startup.c 	\
-$(SRC_DIR)/system_stm32f4xx.c
+SRC = \
+    $(SRC_DIR)/STM32_startup.c      \
+    $(SRC_DIR)/system_stm32f4xx.c   \
+    $(SRC_DIR)/GPIO.c               \
+    $(SRC_DIR)/TIM.c                \
+    $(SRC_DIR)/Timer.c              \
+    $(SRC_DIR)/PWM.c                \
+    $(SRC_DIR)/I2C.c                \
+    $(SRC_DIR)/MPU6050.c            \
+    $(SRC_DIR)/ADC.c                \
+    $(SRC_DIR)/Sensor.c             \
+    $(SRC_DIR)/Drone.c              \
+    $(SRC_DIR)/UART.c               \
+    $(SRC_DIR)/gyro_filter.c        \
+    $(SRC_DIR)/imu_mahony.c         \
+    $(SRC_DIR)/pid_controller.c     \
+    $(SRC_DIR)/math_impl.c     \
+    $(SRC_DIR)/main.c
 
-# $(wildcard $(SRC_DIR)/*.c) Esto agarra todos los archivos .c en la carpeta sources
-
-INCLUDES = 				\
--I$(INCLUDE_DIR)		\
--I$(CMSIS_CORE_DIR)		\
--I$(CMSIS_STM32_DIR)	
+INCLUDES = \
+    -I$(INC_DIR)                    \
+    -ICMSIS/Core/include            \
+    -ICMSIS/STM32F4xx/include

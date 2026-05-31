@@ -1,161 +1,194 @@
-﻿/**
+/**
  * @file main.c
- * @brief ESC PWM test for 4 Motors
+ * @brief Test calibración + IMU a 400kHz
  *
- * This program generates a PWM signal using TIM2
- * to control a brushless ESC in Servo PWM mode.
+ * Verifica que:
+ *  1. El gyro calibra correctamente a 400kHz
+ *  2. El IMU Mahony converge a Roll=0 Pitch=0 en reposo
+ *  3. Los ángulos cambian correctamente al inclinar el dron
  *
- * The ESC is first armed at minimum throttle,
- * then the motor is commanded to spin slowly.
- *
- * @authors
- * David Mijares
- * Aldo De la Torre
- * Jose Paez
+ * Sin motores — solo sensor y cálculos.
  */
 
 #include <stdint.h>
-
-#include "PWM.h"
-#include "Sensor.h"
+#include <stdbool.h>
 #include "Timer.h"
-#include "Drone.h"
+#include "MPU6050.h"
+#include "UART.h"
+#include "gyro_filter.h"
+#include "imu_mahony.h"
 
-// ======================================================
-// TIMER CONFIGURATION
-// ======================================================
+#define DELAY_TIM    TIM_3
+#define I2C_PORT     B
+#define I2C_SCL_PIN  8
+#define I2C_SDA_PIN  9
+#define I2C_PIN_MODE 2
 
-// Timer used for PWM generation
-#define MOTOR_TIM2 TIM_2
-#define MOTOR_TIM4 TIM_4
+#define UART_PRINT_MS  100   /* imprimir cada 200ms */
 
+/* TIM5 a 1kHz para el loop de lectura */
+static void tim5_init_1kHz(void)
+{
+    RCC->APB1ENR |= (1U << 3);
+    TIM5->CR1  = 0;
+    TIM5->PSC  = 15;
+    TIM5->ARR  = 999;
+    TIM5->EGR  = 1;
+    TIM5->SR   = 0;
+    TIM5->DIER = (1U << 0);
+    NVIC->ISER[50 >> 5] = (1U << (50 & 0x1F));
+    NVIC->IP[50] = 0x10;
+    TIM5->CR1 |= (1U << 0);
+}
 
-// Timer used for delays
-#define DELAY_TIM TIM_3
+static GyroPipeline_t  gyroPipeline;
+static ImuState_t      imuState;
+static MPU6050_t       mpuData;
 
-// ESC Servo PWM frequency
-#define FREQUENCY 50
+static volatile bool     pidLoopFlag = false;
+static volatile uint32_t loopCount   = 0;
+static uint32_t          lastPrint   = 0;
 
-// ======================================================
-// MOTOR 1 CONFIGURATION
-// ======================================================
+void TIM5_IRQHandler(void)
+{
+    if (TIM5->SR & (1U << 0)) {
+        TIM5->SR   &= ~(1U << 0);
+        pidLoopFlag = true;
+        loopCount++;
+    }
+}
 
-#define MOTOR_1_PIN 0
-#define MOTOR_1_GPIO A
-#define MOTOR_1_CHANNEL channel_1
-
-// ======================================================
-// MOTOR 2 CONFIGURATION
-// ======================================================
-
-#define MOTOR_2_PIN 1
-#define MOTOR_2_GPIO A
-#define MOTOR_2_CHANNEL channel_2
-
-// ======================================================
-// MOTOR 3 CONFIGURATION
-// ======================================================
-
-#define MOTOR_3_PIN 6
-#define MOTOR_3_GPIO B
-#define MOTOR_3_CHANNEL channel_1
-
-// ======================================================
-// MOTOR 4 CONFIGURATION
-// ======================================================
-
-#define MOTOR_4_PIN 7
-#define MOTOR_4_GPIO B
-#define MOTOR_4_CHANNEL channel_2
-
-// ======================================================
-// ESC CONFIGURATION
-// ======================================================
-
-// Minimum throttle
-// 5 -> 1000 us
-#define ESC_MIN_DUTY 5
-
-// Maximum throttle
-// 10 -> 2000 us
-#define ESC_MAX_DUTY 10
-
-// ESC arming throttle
-#define ESC_ARM_DUTY 5
-
-// Low throttle for slow motor spin
-#define ESC_TEST_DUTY 6
-
-/**
- * @brief Main program
- *
- * Program flow:
- *
- * 1. Initialize PWM
- * 2. Send minimum throttle
- * 3. Wait for ESC arming
- * 4. Send low throttle
- * 5. Keep motor spinning slowly
- *
- * @return
- * Never returns
- */
 int main(void)
 {
-    // ==================================================
-    // INITIALIZE PWM
-    // ==================================================
-    
-    // Configure PA0 as PWM output
-    pwm_init(MOTOR_1_GPIO, MOTOR_TIM2, MOTOR_1_PIN);
-    pwm_init(MOTOR_2_GPIO, MOTOR_TIM2, MOTOR_2_PIN);
-    pwm_init(MOTOR_3_GPIO, MOTOR_TIM4, MOTOR_3_PIN);
-    pwm_init(MOTOR_4_GPIO, MOTOR_TIM4, MOTOR_4_PIN);
+    uart_init();
+    uart_sendLine("=== Test Calibración + IMU @ 400kHz ===");
 
-    // ==================================================
-    // ARM ESC
-    // ==================================================
-
-    // Send minimum throttle signal
-    pwm_setSignal(MOTOR_TIM2, MOTOR_1_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
-    pwm_setSignal(MOTOR_TIM2, MOTOR_2_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
-    pwm_setSignal(MOTOR_TIM4, MOTOR_3_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
-    pwm_setSignal(MOTOR_TIM4, MOTOR_4_CHANNEL, FREQUENCY, ESC_ARM_DUTY);
-
-    // Start PWM generation
-    pwm_start(MOTOR_TIM2, MOTOR_1_CHANNEL);
-    pwm_start(MOTOR_TIM2, MOTOR_2_CHANNEL);
-    pwm_start(MOTOR_TIM4, MOTOR_3_CHANNEL);
-    pwm_start(MOTOR_TIM4, MOTOR_4_CHANNEL);
-
-    // ==================================================
-    // INITIALIZE DELAY TIMER
-    // ==================================================
-
-    // Configure TIM3 for delays
     timer_init(DELAY_TIM);
 
-    // Wait for ESC startup
-    timer_delay_ms(DELAY_TIM, 3000);
+    /* MPU6050 */
+    mpu6050_init(I2C_PORT, I2C_SCL_PIN, I2C_SDA_PIN, I2C_PIN_MODE);
+    mpu6050_config(0x1B, 0x18);   /* Gyro  ±2000°/s */
+    mpu6050_config(0x1C, 0x00);   /* Accel ±2g      */
+    mpu6050_config(0x1A, 0x02);   /* DLPF  98Hz     */
+    uart_sendLine("MPU6050 OK");
 
-    // ==================================================
-    // START MOTOR
-    // ==================================================
+    /* Inicializar módulos */
+    gyroPipelineInit(&gyroPipeline);
+    imuInit(&imuState);
 
-    pwm_setSignal(MOTOR_TIM2, MOTOR_1_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
-    pwm_setSignal(MOTOR_TIM2, MOTOR_2_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
-    pwm_setSignal(MOTOR_TIM4, MOTOR_3_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
-    pwm_setSignal(MOTOR_TIM4, MOTOR_4_CHANNEL, FREQUENCY, ESC_TEST_DUTY);
+    /* Arrancar loop */
+    tim5_init_1kHz();
 
-    // ==================================================
-    // MAIN LOOP
-    // ==================================================
+    uart_sendLine(">>> PON EL DRON QUIETO Y PLANO <<<");
+    uart_sendLine("Calibrando...");
 
-    while (1)
-    {
-        // Delay for 1 second
-        timer_delay_ms(DELAY_TIM, 1000);
+    /* Esperar calibración */
+    uint32_t lastCalPrint = 0;
+    while (!gyroCalibrationIsComplete(&gyroPipeline.calib)) {
+        if (pidLoopFlag) {
+            pidLoopFlag = false;
+            mpu6050_readData(&mpuData);
+            gyroPipelineUpdate(&gyroPipeline,
+                               mpuData.gx, mpuData.gy, mpuData.gz);
+        }
+        if ((loopCount - lastCalPrint) >= 200) {
+            lastCalPrint = loopCount;
+            uart_sendString("CAL: ");
+            uart_sendInt(gyroPipeline.calib.cyclesRemaining);
+            uart_sendString(" | bias X:");
+            uart_sendFloat(gyroPipeline.calib.bias[0] * GYRO_SCALE_DPS, 2);
+            uart_sendString(" Y:");
+            uart_sendFloat(gyroPipeline.calib.bias[1] * GYRO_SCALE_DPS, 2);
+            uart_sendString(" Z:");
+            uart_sendFloat(gyroPipeline.calib.bias[2] * GYRO_SCALE_DPS, 2);
+            uart_sendLine(" dps");
+        }
     }
 
+    /* Imprimir bias final */
+    uart_sendString("✓ Calibrado! Bias final: X=");
+    uart_sendFloat(gyroPipeline.calib.bias[0] * GYRO_SCALE_DPS, 3);
+    uart_sendString(" Y=");
+    uart_sendFloat(gyroPipeline.calib.bias[1] * GYRO_SCALE_DPS, 3);
+    uart_sendString(" Z=");
+    uart_sendFloat(gyroPipeline.calib.bias[2] * GYRO_SCALE_DPS, 3);
+    uart_sendLine(" dps");
+    uart_sendLine("Convergiendo IMU... espera 2s plano");
+
+    /* Dar tiempo al IMU para converger */
+    uint32_t convStart = loopCount;
+    while ((loopCount - convStart) < 2000) {
+        if (pidLoopFlag) {
+            pidLoopFlag = false;
+            mpu6050_readData(&mpuData);
+            gyroPipelineUpdate(&gyroPipeline,
+                               mpuData.gx, mpuData.gy, mpuData.gz);
+            float ax = (float)mpuData.ax * ACC_SCALE_G;
+            float ay = (float)mpuData.ay * ACC_SCALE_G;
+            float az = (float)mpuData.az * ACC_SCALE_G;
+            imuMahonyUpdate(&imuState, 0.001f,
+                            gyroPipeline.gyroRad[AXIS_X],
+                            gyroPipeline.gyroRad[AXIS_Y],
+                            gyroPipeline.gyroRad[AXIS_Z],
+                            imuAccIsHealthy(ax, ay, az),
+                            ax, ay, az);
+        }
+    }
+
+    uart_sendLine("✓ IMU listo. Inclina el dron para verificar angulos.");
+    uart_sendLine("Formato: R=roll P=pitch Y=yaw | gyr X Y Z dps | acc healthy");
+    uart_sendLine("----------------------------------------------------------");
+
+    /* Loop principal */
+    while (1)
+    {
+        if (pidLoopFlag) {
+            pidLoopFlag = false;
+
+            mpu6050_readData(&mpuData);
+            gyroPipelineUpdate(&gyroPipeline,
+                               mpuData.gx, mpuData.gy, mpuData.gz);
+
+            float ax = (float)mpuData.ax * ACC_SCALE_G;
+            float ay = (float)mpuData.ay * ACC_SCALE_G;
+            float az = (float)mpuData.az * ACC_SCALE_G;
+            bool  healthy = imuAccIsHealthy(ax, ay, az);
+
+            imuMahonyUpdate(&imuState, 0.001f,
+                            gyroPipeline.gyroRad[AXIS_X],
+                            gyroPipeline.gyroRad[AXIS_Y],
+                            gyroPipeline.gyroRad[AXIS_Z],
+                            healthy, ax, ay, az);
+        }
+
+        if ((loopCount - lastPrint) >= UART_PRINT_MS) {
+            lastPrint = loopCount;
+
+            /* Ángulos */
+            uart_sendString("R:");
+            uart_sendFloat(imuGetRollDeg(&imuState),  1);
+            uart_sendString("  P:");
+            uart_sendFloat(imuGetPitchDeg(&imuState), 1);
+            uart_sendString("  Y:");
+            uart_sendFloat(imuGetYawDeg(&imuState),   1);
+
+            /* Gyro filtrado en dps */
+            uart_sendString(" | gyr X:");
+            uart_sendFloat(gyroPipeline.gyroDPS[0], 1);
+            uart_sendString(" Y:");
+            uart_sendFloat(gyroPipeline.gyroDPS[1], 1);
+            uart_sendString(" Z:");
+            uart_sendFloat(gyroPipeline.gyroDPS[2], 1);
+
+            /* Salud del accel */
+            uart_sendString(" | acc:");
+            float ax = (float)mpuData.ax * ACC_SCALE_G;
+            float ay = (float)mpuData.ay * ACC_SCALE_G;
+            float az = (float)mpuData.az * ACC_SCALE_G;
+            uart_sendChar(imuAccIsHealthy(ax, ay, az) ? '1' : '0');
+
+            uart_sendLine("");
+        }
+    }
     return 0;
 }
