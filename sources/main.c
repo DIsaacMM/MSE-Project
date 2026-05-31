@@ -55,6 +55,9 @@
 #define ITERM_ZONE_DEG   5.0f        /* zona muerta del integrador:       */
                                      /* Ki solo actúa si |error| < 5°    */
                                      /* (del código de referencia Arduino) */
+#define LEVEL_KP_DPS_PER_DEG  2.0f   /* ganancia P para nivelar (dps/°)   */
+#define LEVEL_RATE_LIMIT_DPS  120.0f /* límite de setpoint para nivelar   */
+#define MOTOR_CORR_LIMIT_US 250.0f   /* límite de corrección PID al motor (μs) */
 #define UART_PRINT_MS    100         /* frecuencia de debug UART (ms)     */
 #define PWM_UPDATE_MS    20          /* frecuencia de señal al ESC (ms)   */
 
@@ -70,6 +73,8 @@ static volatile uint16_t motor1PWM  = ESC_MIN_US;
 static volatile bool     pidLoopFlag = false;
 static volatile uint32_t loopCount   = 0;
 static uint32_t          lastPrint   = 0;
+static float             rollSetpointDps = 0.0f;
+static float             motorCorrectionUS = 0.0f;
 
 /* ── TIM5 1kHz ── */
 static void tim5_init_1kHz(void)
@@ -87,12 +92,12 @@ static void tim5_init_1kHz(void)
 }
 
 /* Clamp con doble protección: float y uint16_t */
-static uint16_t clamp_us(float v)
+static float clamp_us(float v, float min, float max)
 {
-    if (v != v) return ESC_MIN_US;          /* NaN → mínimo seguro       */
-    if (v < (float)ESC_MIN_US) return ESC_MIN_US;
-    if (v > (float)ESC_MAX_US) return ESC_MAX_US;
-    return (uint16_t)v;
+    if (v != v) return 0.0f;          /* NaN → mínimo seguro       */
+    if (v < min) return min;
+    if (v > max) return max;
+    return v;
 }
 
 void TIM5_IRQHandler(void)
@@ -243,24 +248,29 @@ int main(void)
                     /* Fuera de zona: no integrar, congelar I-term */
                     float savedKi = pidState.gains[PID_AXIS_ROLL].Ki;
                     pidState.gains[PID_AXIS_ROLL].Ki = 0.0f;
-                    pidUpdate(&pidState, 0.0f, 0.0f, 0.0f,
+                    rollSetpointDps = clamp_us(roll * LEVEL_KP_DPS_PER_DEG,
+                                                              -LEVEL_RATE_LIMIT_DPS,
+                                                              +LEVEL_RATE_LIMIT_DPS),
+                    pidUpdate(&pidState, rollSetpointDps, 0.0f, 0.0f,
                               gyroRoll,
                               gyroPipeline.gyroDPS[AXIS_Y],
                               gyroPipeline.gyroDPS[AXIS_Z]);
                     pidState.gains[PID_AXIS_ROLL].Ki = savedKi;
                 } else {
-                    pidUpdate(&pidState, 0.0f, 0.0f, 0.0f,
+                    pidUpdate(&pidState, rollSetpointDps, 0.0f, 0.0f,
                               gyroRoll,
                               gyroPipeline.gyroDPS[AXIS_Y],
                               gyroPipeline.gyroDPS[AXIS_Z]);
                 }
 
                 /* 4. Mixer M1 con clamp y protección NaN */
-                const float PID_SCALE = 1000.0f;
-                const float tNorm = ((float)THROTTLE_BASE - 1000.0f) / 1000.0f;
-                float m1 = tNorm + pidState.output[PID_AXIS_ROLL].sum / PID_SCALE;
-                motor1PWM = clamp_us(1000.0f + 1000.0f * m1);
+                motorCorrectionUS = clamp_us(pidState.output[PID_AXIS_ROLL].sum,
+                    -MOTOR_CORR_LIMIT_US, 
+                    MOTOR_CORR_LIMIT_US);
+                motor1PWM = clamp_us((float)THROTTLE_BASE + motorCorrectionUS,ESC_MIN_US, ESC_MAX_US);
                 LED_ON();
+                rollSetpointDps = 0.0f; /* nivelar → setpoint 0 dps */
+                motorCorrectionUS = 0.0f; /* resetear corrección si NaN */
             } else {
                 /* En nivel: resetear I-term y volver a throttle base */
                 pidResetIterm(&pidState);
@@ -284,6 +294,8 @@ int main(void)
             uart_sendString("Roll:");
             uart_sendFloat(imuGetRollDeg(&imuState), 1);
             uart_sendString("  PID_R:");
+            uart_sendString("   SP_R:");
+            uart_sendFloat(rollSetpointDps, 1);
             uart_sendFloat(pidState.output[PID_AXIS_ROLL].sum, 2);
             uart_sendString("  M1:");
             uart_sendInt((uint16_t)motor1PWM);

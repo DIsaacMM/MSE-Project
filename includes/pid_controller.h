@@ -97,8 +97,8 @@
  * ========================================================= */
 
 /* Roll (eje X) */
-#define PID_KP_ROLL     0.0f
-#define PID_KI_ROLL     0.0f
+#define PID_KP_ROLL     1.0f
+#define PID_KI_ROLL     0.05f
 #define PID_KD_ROLL     0.0f
 
 /* Pitch (eje Y) — normalmente igual a Roll */
