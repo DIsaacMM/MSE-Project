@@ -106,6 +106,46 @@ void pwm_init(port_t p, tim_t t, uint8_t pin)
 
     // Enable selected timer
     tim_initTimer(t);
+
+    /* Configurar timer para PWM 50Hz — solo se hace una vez aquí.
+     * PSC=15 → tick=1μs | ARR=19999 → período=20ms=50Hz */
+    TIM[t]->CR1  &= ~(1U << 0);    /* detener para configurar         */
+    TIM[t]->PSC   = 15;
+    TIM[t]->ARR   = 20000 - 1;
+
+    /* Configurar modo PWM Mode 1 en el canal correspondiente */
+    /* Canal 1 */
+    TIM[t]->CCMR1 &= ~(7U << 4);
+    TIM[t]->CCMR1 |=  (6U << 4);
+    TIM[t]->CCMR1 |=  (1U << 3);   /* OC1PE preload */
+    TIM[t]->CCER  |=  (1U << 0);   /* CC1E output enable */
+    TIM[t]->CCR1   = 1000;          /* valor inicial: 1000μs (mínimo) */
+
+    /* Canal 2 */
+    TIM[t]->CCMR1 &= ~(7U << 12);
+    TIM[t]->CCMR1 |=  (6U << 12);
+    TIM[t]->CCMR1 |=  (1U << 11);  /* OC2PE preload */
+    TIM[t]->CCER  |=  (1U << 4);   /* CC2E output enable */
+    TIM[t]->CCR2   = 1000;
+
+    /* Canal 3 */
+    TIM[t]->CCMR2 &= ~(7U << 4);
+    TIM[t]->CCMR2 |=  (6U << 4);
+    TIM[t]->CCMR2 |=  (1U << 3);   /* OC3PE preload */
+    TIM[t]->CCER  |=  (1U << 8);   /* CC3E output enable */
+    TIM[t]->CCR3   = 1000;
+
+    /* Canal 4 */
+    TIM[t]->CCMR2 &= ~(7U << 12);
+    TIM[t]->CCMR2 |=  (6U << 12);
+    TIM[t]->CCMR2 |=  (1U << 11);  /* OC4PE preload */
+    TIM[t]->CCER  |=  (1U << 12);  /* CC4E output enable */
+    TIM[t]->CCR4   = 1000;
+
+    TIM[t]->CR1  |=  (1U << 7);    /* ARPE: ARR preload enable        */
+    TIM[t]->EGR  |=  (1U << 0);    /* UG: aplicar PSC/ARR ahora       */
+    TIM[t]->SR   &= ~(1U << 0);    /* limpiar flag de update          */
+    TIM[t]->CR1  |=  (1U << 0);    /* CEN: iniciar contador           */
 }
 
 /**
@@ -161,109 +201,21 @@ void pwm_setSignal(tim_t t, channel_t chann, uint32_t frecuency, uint16_t pulse_
 {
     (void)frecuency;
 
-    // ==========================================
-    // CLAMP LIMITS
-    // ==========================================
+    /* Clamp — nunca salir del rango ESC estándar */
+    if (pulse_us < 1000) pulse_us = 1000;
+    if (pulse_us > 2000) pulse_us = 2000;
 
-    if(pulse_us < 1000)
-    {
-        pulse_us = 1000;
-    }
-
-    if(pulse_us > 2000)
-    {
-        pulse_us = 2000;
-    }
-
-    // ==========================================
-    // STOP TIMER
-    // ==========================================
-
-    TIM[t]->CR1 &= ~(1U << 0);
-
-    // ==========================================
-    // TIMER CONFIGURATION
-    // ==========================================
-
-    TIM[t]->PSC = 15;
-
-    TIM[t]->ARR = 20000 - 1;
-
-    // ==========================================
-    // PWM MODE CONFIGURATION
-    // ==========================================
-
+    /* Solo actualizar el registro de comparación (CCR).
+     * PSC, ARR, CCMR y EGR se configuran UNA SOLA VEZ en pwm_init.
+     * Tocarlos aquí puede causar glitches en la señal activa. */
     switch(chann)
     {
-        case channel_1:
-
-            TIM[t]->CCMR1 &= ~(7U << 4);
-            TIM[t]->CCMR1 |= (6U << 4);
-            TIM[t]->CCMR1 |= (1U << 3);
-
-            TIM[t]->CCR1 = pulse_us;
-
-            TIM[t]->CCER |= (1U << 0);
-
-            break;
-
-        case channel_2:
-
-            TIM[t]->CCMR1 &= ~(7U << 12);
-            TIM[t]->CCMR1 |= (6U << 12);
-            TIM[t]->CCMR1 |= (1U << 11);
-
-            TIM[t]->CCR2 = pulse_us;
-
-            TIM[t]->CCER |= (1U << 4);
-
-            break;
-
-        case channel_3:
-
-            TIM[t]->CCMR2 &= ~(7U << 4);
-            TIM[t]->CCMR2 |= (6U << 4);
-            TIM[t]->CCMR2 |= (1U << 3);
-
-            TIM[t]->CCR3 = pulse_us;
-
-            TIM[t]->CCER |= (1U << 8);
-
-            break;
-
-        case channel_4:
-
-            TIM[t]->CCMR2 &= ~(7U << 12);
-            TIM[t]->CCMR2 |= (6U << 12);
-            TIM[t]->CCMR2 |= (1U << 11);
-
-            TIM[t]->CCR4 = pulse_us;
-
-            TIM[t]->CCER |= (1U << 12);
-
-            break;
-
-        default:
-            return;
+        case channel_1:  TIM[t]->CCR1 = pulse_us; break;
+        case channel_2:  TIM[t]->CCR2 = pulse_us; break;
+        case channel_3:  TIM[t]->CCR3 = pulse_us; break;
+        case channel_4:  TIM[t]->CCR4 = pulse_us; break;
+        default: return;
     }
-
-    // ==========================================
-    // ENABLE ARR PRELOAD
-    // ==========================================
-
-    TIM[t]->CR1 |= (1U << 7);
-
-    // ==========================================
-    // FORCE UPDATE
-    // ==========================================
-
-    TIM[t]->EGR |= (1U << 0);
-
-    // ==========================================
-    // START TIMER
-    // ==========================================
-
-    TIM[t]->CR1 |= (1U << 0);
 }
 
 
@@ -348,16 +300,3 @@ void pwm_stop(tim_t t, channel_t chann)
     // Stop timer counter
     TIM[t]->CR1 &= ~(1U << 0);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
