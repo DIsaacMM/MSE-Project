@@ -18,7 +18,7 @@ SRC = \
 	   $(SRC_DIR)/mpu6050.c     	\
     $(SRC_DIR)/main.c
 
-INCLUDES = \
+INCLUDES = 							\
     -I$(INC_DIR)                    \
     -ICMSIS/Core/include            \
     -ICMSIS/STM32F4xx/include
