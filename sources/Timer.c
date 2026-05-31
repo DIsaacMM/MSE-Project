@@ -65,3 +65,9 @@ void timer_delay_ms(tim_t t, uint16_t delay_ms)
     tim_waitTimer(t);
     tim_disableTimer(t);
 }
+
+uint32_t timer_get_ms(tim_t t)
+{
+    /* CNT avanza a 1 MHz (1 tick = 1 µs) → dividir entre 1000 da ms */
+    return (uint32_t)(TIM[t]->CNT / 1000U);
+}

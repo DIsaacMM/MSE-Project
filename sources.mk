@@ -10,7 +10,10 @@ $(SRC_DIR)/PWM.c			\
 $(SRC_DIR)/TIM.c			\
 $(SRC_DIR)/Timer.c			\
 $(SRC_DIR)/ADC.c			\
-$(SRC_DIR)/Sensor.c		\
+$(SRC_DIR)/Sensor.c			\
+$(SRC_DIR)/Drone.c			\
+$(SRC_DIR)/PID.c			\
+$(SRC_DIR)/MPU6050.c		\
 $(SRC_DIR)/STM32_startup.c 	\
 $(SRC_DIR)/system_stm32f4xx.c
 

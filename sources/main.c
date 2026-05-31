@@ -17,17 +17,9 @@
 #include <stdint.h>
 
 #include "PWM.h"
-#include "Sensor.h"
 #include "Timer.h"
 #include "Drone.h"
-
-// ======================================================
-// TIMER CONFIGURATION
-// ======================================================
-
-// Timer used for PWM generation
-#define MOTOR_TIM2 TIM_2
-#define MOTOR_TIM4 TIM_4
+#include "PID.h"
 
 
 // Timer used for delays
@@ -36,37 +28,6 @@
 // ESC Servo PWM frequency
 #define FREQUENCY 50
 
-// ======================================================
-// MOTOR 1 CONFIGURATION
-// ======================================================
-
-#define MOTOR_1_PIN 0
-#define MOTOR_1_GPIO A
-#define MOTOR_1_CHANNEL channel_1
-
-// ======================================================
-// MOTOR 2 CONFIGURATION
-// ======================================================
-
-#define MOTOR_2_PIN 1
-#define MOTOR_2_GPIO A
-#define MOTOR_2_CHANNEL channel_2
-
-// ======================================================
-// MOTOR 3 CONFIGURATION
-// ======================================================
-
-#define MOTOR_3_PIN 6
-#define MOTOR_3_GPIO B
-#define MOTOR_3_CHANNEL channel_1
-
-// ======================================================
-// MOTOR 4 CONFIGURATION
-// ======================================================
-
-#define MOTOR_4_PIN 7
-#define MOTOR_4_GPIO B
-#define MOTOR_4_CHANNEL channel_2
 
 // ======================================================
 // ESC CONFIGURATION
@@ -96,76 +57,55 @@
  * Never returns
  */
 
-
  int main(void)
 {
     // ==================================================
     // INITIALIZE PWM
     // ==================================================
-    
-    // Configure PA0 as PWM output
-    pwm_init(MOTOR_1_GPIO, MOTOR_TIM2, MOTOR_1_PIN);
-    pwm_init(MOTOR_2_GPIO, MOTOR_TIM2, MOTOR_2_PIN);
-    pwm_init(MOTOR_3_GPIO, MOTOR_TIM4, MOTOR_3_PIN);
-    pwm_init(MOTOR_4_GPIO, MOTOR_TIM4, MOTOR_4_PIN);
-
-    // ==================================================
-    // ARM ESC
-    // ==================================================
-
-    // Send minimum throttle signal
-    pwm_setSignal(MOTOR_TIM2, MOTOR_1_CHANNEL, FREQUENCY, ESC_MIN_US);
-    pwm_setSignal(MOTOR_TIM2, MOTOR_2_CHANNEL, FREQUENCY, ESC_MIN_US);
-    pwm_setSignal(MOTOR_TIM4, MOTOR_3_CHANNEL, FREQUENCY, ESC_MIN_US);
-    pwm_setSignal(MOTOR_TIM4, MOTOR_4_CHANNEL, FREQUENCY, ESC_MIN_US);
-
-    // Start PWM generation
-    pwm_start(MOTOR_TIM2, MOTOR_1_CHANNEL);
-    pwm_start(MOTOR_TIM2, MOTOR_2_CHANNEL);
-    pwm_start(MOTOR_TIM4, MOTOR_3_CHANNEL);
-    pwm_start(MOTOR_TIM4, MOTOR_4_CHANNEL);
-
-    // ==================================================
-    // INITIALIZE DELAY TIMER
-    // ==================================================
-
-    // Configure TIM3 for delays
-    timer_init(DELAY_TIM);
-
-    // Wait for ESC startup
-    timer_delay_ms(DELAY_TIM, 3000);
 
 
+    PID_Init(); 
+
+    // drone_init(); 
+
+    // timer_init(DELAY_TIM); 
+    // timer_delay_ms(DELAY_TIM, 5000);
     // ==================================================
     // MAIN LOOP
     // ==================================================
 
     while (1)
     {
-        for(uint16_t i = ESC_MIN_US; i < 1100; i++)
-        {
-            pwm_setSignal(MOTOR_TIM2, MOTOR_1_CHANNEL, FREQUENCY, i);
-            pwm_setSignal(MOTOR_TIM2, MOTOR_2_CHANNEL, FREQUENCY, i);
-            pwm_setSignal(MOTOR_TIM4, MOTOR_3_CHANNEL, FREQUENCY, i);
-            pwm_setSignal(MOTOR_TIM4, MOTOR_4_CHANNEL, FREQUENCY, i);
-            timer_delay_ms(DELAY_TIM, 20);
-        }
+            PID_Update();
+            // m1.setSignal(m1.tim, m1.channel, FREQUENCY, 1050); 
+            // m2.setSignal(m2.tim, m2.channel, FREQUENCY, 1050); 
+            // m3.setSignal(m3.tim, m3.channel, FREQUENCY, 1050); 
+            // m4.setSignal(m4.tim, m4.channel,FREQUENCY, 1050); 
+            // timer_delay_ms(DELAY_TIM, 20);
 
-        for(uint16_t i = 1000; i > 1000; i--)
-        {
-            pwm_setSignal(MOTOR_TIM2, MOTOR_1_CHANNEL, FREQUENCY, i);
-            pwm_setSignal(MOTOR_TIM2, MOTOR_2_CHANNEL, FREQUENCY, i);
-            pwm_setSignal(MOTOR_TIM4, MOTOR_3_CHANNEL, FREQUENCY, i);
-            pwm_setSignal(MOTOR_TIM4, MOTOR_4_CHANNEL, FREQUENCY, i);
-            timer_delay_ms(DELAY_TIM, 20);
-        }
+        // for(uint16_t i = ESC_MIN_US; i < 1100; i++)
+        // {
+        //     pwm_setSignal(MOTOR_TIM2, MOTOR_1_CHANNEL, FREQUENCY, i);
+        //     pwm_setSignal(MOTOR_TIM2, MOTOR_2_CHANNEL, FREQUENCY, i);
+        //     pwm_setSignal(MOTOR_TIM4, MOTOR_3_CHANNEL, FREQUENCY, i);
+        //     pwm_setSignal(MOTOR_TIM4, MOTOR_4_CHANNEL, FREQUENCY, i);
+        //     timer_delay_ms(DELAY_TIM, 20);
+        // }
 
-        while (1)
-        {
-            timer_delay_ms(DELAY_TIM, 1000);
-        }        
+        // for(uint16_t i = 1000; i > 1000; i--)
+        // {
+        //     pwm_setSignal(MOTOR_TIM2, MOTOR_1_CHANNEL, FREQUENCY, i);
+        //     pwm_setSignal(MOTOR_TIM2, MOTOR_2_CHANNEL, FREQUENCY, i);
+        //     pwm_setSignal(MOTOR_TIM4, MOTOR_3_CHANNEL, FREQUENCY, i);
+        //     pwm_setSignal(MOTOR_TIM4, MOTOR_4_CHANNEL, FREQUENCY, i);
+        //     timer_delay_ms(DELAY_TIM, 20);
+        // }
+
+        // while (1)
+        // {
+        //     timer_delay_ms(DELAY_TIM, 1000);
+        // }        
     }
 
     return 0;
 }
-
