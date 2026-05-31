@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file main.c
  * @brief Test PID — Motor 1 únicamente
  *
@@ -27,10 +27,9 @@
 #include "gyro_filter.h"
 #include "imu_mahony.h"
 #include "pid_controller.h"
+#include "Drone.h"
 
 /* ── Hardware ── */
-#define MOTOR_TIM2       TIM_2
-#define MOTOR_1_CHANNEL  channel_1
 #define FREQUENCY        50
 #define DELAY_TIM        TIM_3
 #define I2C_PORT         B
@@ -77,18 +76,22 @@ static float             rollSetpointDps = 0.0f;
 static float             motorCorrectionUS = 0.0f;
 
 /* ── TIM5 1kHz ── */
-static void tim5_init_1kHz(void)
+static void TIM5_PID(void)
 {
-    RCC->APB1ENR |= (1U << 3);
-    TIM5->CR1  = 0;
-    TIM5->PSC  = 15;
-    TIM5->ARR  = 999;
-    TIM5->EGR  = 1;
-    TIM5->SR   = 0;
-    TIM5->DIER = (1U << 0);
-    NVIC->ISER[50 >> 5] = (1U << (50 & 0x1F));
-    NVIC->IP[50] = 0x10;
-    TIM5->CR1 |= (1U << 0);
+    tim_init();
+
+    tim_initTimer(TIM_5);
+    tim_setTimerFreq(TIM_5, 1000);
+
+    /* Habilitar interrupción por update */
+    TIM[TIM_5]->DIER |= TIM_DIER_UIE;
+
+    /* Configurar NVIC para TIM5 */
+    NVIC_EnableIRQ(TIM5_IRQn);
+    NVIC_SetPriority(TIM5_IRQn, 1);
+
+    /* Arrancar timer */
+    tim_enableTimer(TIM_5);
 }
 
 /* Clamp con doble protección: float y uint16_t */
@@ -114,12 +117,10 @@ int main(void)
     uart_init();
     LED_INIT();
     LED_OFF();
-    uart_sendLine("=== Test PID Motor 1 ===");
+    uart_sendLine("=== Test PID Motor ===");
 
-    /* ── PWM motor 1 — señal mínima inmediata ── */
-    pwm_init(A, MOTOR_TIM2, 0);
-    pwm_setSignal(MOTOR_TIM2, MOTOR_1_CHANNEL, FREQUENCY, ESC_MIN_US);
-    pwm_start(MOTOR_TIM2, MOTOR_1_CHANNEL);
+    /* ── Initialize Motors ── */
+    drone_init(); 
 
     /* ── Armar ESC 5s ── */
     uart_sendLine("Armando ESC (5s)...");
@@ -138,54 +139,53 @@ int main(void)
     imuInit(&imuState);
     pidInit(&pidState);
 
-    /* ── Iniciar loop 1kHz ── */
-    tim5_init_1kHz();
+    /* ── Iniciar loop 1kHz para el PID ── */
+
+    TIM5_PID();
 
     /* ── Calibración (motores en mínimo) ── */
     uart_sendLine(">>> PON EL DRON QUIETO Y PLANO <<<");
     uart_sendLine("Calibrando...");
     uint32_t lastCalPrint = 0;
-    while (!gyroCalibrationIsComplete(&gyroPipeline.calib)) {
-        if (pidLoopFlag) {
+    while (!gyroCalibrationIsComplete(&gyroPipeline.calib)) 
+    {
+        if (pidLoopFlag) 
+        {
             pidLoopFlag = false;
             mpu6050_readData(&mpuData);
-            gyroPipelineUpdate(&gyroPipeline,
-                               mpuData.gx, mpuData.gy, mpuData.gz);
+            gyroPipelineUpdate(&gyroPipeline, mpuData.gx, mpuData.gy, mpuData.gz);
         }
-        if ((loopCount - lastCalPrint) >= 200) {
+        if ((loopCount - lastCalPrint) >= 200) 
+        {
             lastCalPrint = loopCount;
             uart_sendString("CAL: ");
             uart_sendInt(gyroPipeline.calib.cyclesRemaining);
             uart_sendLine("");
         }
     }
-    uart_sendLine("✓ Calibrado!");
+    uart_sendLine("=== Calibrado ===");
 
     /* ── Converger IMU 2s ── */
     uint32_t convStart = loopCount;
-    while ((loopCount - convStart) < 2000) {
-        if (pidLoopFlag) {
+    while ((loopCount - convStart) < 2000) 
+    {
+        if (pidLoopFlag) 
+        {
             pidLoopFlag = false;
             mpu6050_readData(&mpuData);
-            gyroPipelineUpdate(&gyroPipeline,
-                               mpuData.gx, mpuData.gy, mpuData.gz);
+            gyroPipelineUpdate(&gyroPipeline, mpuData.gx, mpuData.gy, mpuData.gz);
             float ax = (float)mpuData.ax * ACC_SCALE_G;
             float ay = (float)mpuData.ay * ACC_SCALE_G;
             float az = (float)mpuData.az * ACC_SCALE_G;
-            imuMahonyUpdate(&imuState, 0.001f,
-                            gyroPipeline.gyroRad[AXIS_X],
-                            gyroPipeline.gyroRad[AXIS_Y],
-                            gyroPipeline.gyroRad[AXIS_Z],
-                            imuAccIsHealthy(ax, ay, az),
-                            ax, ay, az);
+            imuMahonyUpdate(&imuState, 0.001f, gyroPipeline.gyroRad[AXIS_X], gyroPipeline.gyroRad[AXIS_Y], gyroPipeline.gyroRad[AXIS_Z], imuAccIsHealthy(ax, ay, az), ax, ay, az);
         }
     }
-    uart_sendLine("✓ IMU listo.");
+    uart_sendLine("=== IMU listo ===");
 
     /* ── Subir a throttle base con espera no bloqueante ── */
-    uart_sendLine("Arrancando motor 1...");
+    uart_sendLine("Arrancando Motores...");
     motor1PWM = THROTTLE_BASE;
-    pwm_setSignal(MOTOR_TIM2, MOTOR_1_CHANNEL, FREQUENCY, THROTTLE_BASE);
+    m1.setSignal(m1.tim, m1.channel, FREQUENCY, THROTTLE_BASE); 
     {
         uint32_t waitStart = loopCount;
         while ((loopCount - waitStart) < 1000) {
@@ -210,31 +210,27 @@ int main(void)
     while (1)
     {
         /* ── Bloque PID @ 1kHz ── */
-        if (pidLoopFlag) {
+        if (pidLoopFlag) 
+        {
             pidLoopFlag = false;
 
             /* 1. Leer sensor */
             mpu6050_readData(&mpuData);
-            gyroPipelineUpdate(&gyroPipeline,
-                               mpuData.gx, mpuData.gy, mpuData.gz);
+            gyroPipelineUpdate(&gyroPipeline, mpuData.gx, mpuData.gy, mpuData.gz);
 
             float ax = (float)mpuData.ax * ACC_SCALE_G;
             float ay = (float)mpuData.ay * ACC_SCALE_G;
             float az = (float)mpuData.az * ACC_SCALE_G;
             bool  accOk = imuAccIsHealthy(ax, ay, az);
 
-            imuMahonyUpdate(&imuState, 0.001f,
-                            gyroPipeline.gyroRad[AXIS_X],
-                            gyroPipeline.gyroRad[AXIS_Y],
-                            gyroPipeline.gyroRad[AXIS_Z],
-                            accOk, ax, ay, az);
+            imuMahonyUpdate(&imuState, 0.001f, gyroPipeline.gyroRad[AXIS_X], gyroPipeline.gyroRad[AXIS_Y], gyroPipeline.gyroRad[AXIS_Z], accOk, ax, ay, az);
 
             /* 2. Detectar inclinación */
             float roll = imuGetRollDeg(&imuState);
-            bool outOfLevel = (roll >  DEADBAND_DEG ||
-                               roll < -DEADBAND_DEG);
+            bool outOfLevel = (roll >  DEADBAND_DEG || roll < -DEADBAND_DEG);
 
-            if (outOfLevel) {
+            if (outOfLevel) 
+            {
                 /* 3. PID con zona muerta del integrador
                  * Ki solo actúa si |error| < ITERM_ZONE_DEG
                  * (del código de referencia — evita windup grande) */
@@ -242,36 +238,30 @@ int main(void)
 
                 /* Zona muerta del integrador: temporalmente ajustar
                  * Ki a 0 si el error angular es grande */
-                bool inItermZone = (roll > -ITERM_ZONE_DEG &&
-                                    roll <  ITERM_ZONE_DEG);
-                if (!inItermZone) {
+                bool inItermZone = (roll > -ITERM_ZONE_DEG && roll <  ITERM_ZONE_DEG);
+                if (!inItermZone) 
+                {
                     /* Fuera de zona: no integrar, congelar I-term */
                     float savedKi = pidState.gains[PID_AXIS_ROLL].Ki;
                     pidState.gains[PID_AXIS_ROLL].Ki = 0.0f;
-                    rollSetpointDps = clamp_us(roll * LEVEL_KP_DPS_PER_DEG,
-                                                              -LEVEL_RATE_LIMIT_DPS,
-                                                              +LEVEL_RATE_LIMIT_DPS),
-                    pidUpdate(&pidState, rollSetpointDps, 0.0f, 0.0f,
-                              gyroRoll,
-                              gyroPipeline.gyroDPS[AXIS_Y],
-                              gyroPipeline.gyroDPS[AXIS_Z]);
+                    rollSetpointDps = clamp_us(roll * LEVEL_KP_DPS_PER_DEG, -LEVEL_RATE_LIMIT_DPS, +LEVEL_RATE_LIMIT_DPS),
+                    pidUpdate(&pidState, rollSetpointDps, 0.0f, 0.0f, gyroRoll, gyroPipeline.gyroDPS[AXIS_Y], gyroPipeline.gyroDPS[AXIS_Z]);
                     pidState.gains[PID_AXIS_ROLL].Ki = savedKi;
-                } else {
-                    pidUpdate(&pidState, rollSetpointDps, 0.0f, 0.0f,
-                              gyroRoll,
-                              gyroPipeline.gyroDPS[AXIS_Y],
-                              gyroPipeline.gyroDPS[AXIS_Z]);
+                } 
+                else 
+                {
+                    pidUpdate(&pidState, rollSetpointDps, 0.0f, 0.0f, gyroRoll, gyroPipeline.gyroDPS[AXIS_Y], gyroPipeline.gyroDPS[AXIS_Z]);
                 }
 
                 /* 4. Mixer M1 con clamp y protección NaN */
-                motorCorrectionUS = clamp_us(pidState.output[PID_AXIS_ROLL].sum,
-                    -MOTOR_CORR_LIMIT_US, 
-                    MOTOR_CORR_LIMIT_US);
+                motorCorrectionUS = clamp_us(pidState.output[PID_AXIS_ROLL].sum, -MOTOR_CORR_LIMIT_US, MOTOR_CORR_LIMIT_US);
                 motor1PWM = clamp_us((float)THROTTLE_BASE + motorCorrectionUS,ESC_MIN_US, ESC_MAX_US);
                 LED_ON();
                 rollSetpointDps = 0.0f; /* nivelar → setpoint 0 dps */
                 motorCorrectionUS = 0.0f; /* resetear corrección si NaN */
-            } else {
+            } 
+            else 
+            {
                 /* En nivel: resetear I-term y volver a throttle base */
                 pidResetIterm(&pidState);
                 motor1PWM = THROTTLE_BASE;
@@ -282,14 +272,15 @@ int main(void)
         /* ── Bloque PWM @ 50Hz ──
          * loopCount y motor1PWM son volatile — se leen de RAM,
          * no de un registro cacheado del compilador. */
-        if ((loopCount - lastPWM) >= PWM_UPDATE_MS) {
+        if ((loopCount - lastPWM) >= PWM_UPDATE_MS) 
+        {
             lastPWM = loopCount;
-            pwm_setSignal(MOTOR_TIM2, MOTOR_1_CHANNEL,
-                          FREQUENCY, (uint16_t)motor1PWM);
+            m1.setSignal(m1.tim, m1.channel, FREQUENCY, (uint16_t)motor1PWM); 
         }
 
         /* ── Bloque UART debug ── */
-        if ((loopCount - lastPrint) >= UART_PRINT_MS) {
+        if ((loopCount - lastPrint) >= UART_PRINT_MS) 
+        {
             lastPrint = loopCount;
             uart_sendString("Roll:");
             uart_sendFloat(imuGetRollDeg(&imuState), 1);

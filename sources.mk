@@ -9,9 +9,6 @@ SRC = \
     $(SRC_DIR)/Timer.c              \
     $(SRC_DIR)/PWM.c                \
     $(SRC_DIR)/I2C.c                \
-    $(SRC_DIR)/MPU6050.c            \
-    $(SRC_DIR)/ADC.c                \
-    $(SRC_DIR)/Sensor.c             \
     $(SRC_DIR)/Drone.c              \
     $(SRC_DIR)/UART.c               \
     $(SRC_DIR)/gyro_filter.c        \

@@ -48,23 +48,19 @@
     }; 
 
 // Initialize the 4 motors
-void drone_init(uint32_t freq, uint8_t esc_min_duty)
+void drone_init()
 {
-    // Motor 1
+    // Initialize PWM for all Motors 
     m1.init(m1.gpio, m1.tim, m1.pin); 
-    m1.setSignal(m1.tim, m1.channel, freq, esc_min_duty); 
-
-    // Motor 2
-    m2.init(m2.gpio, m2.tim, m2.pin); 
-    m2.setSignal(m2.tim, m2.channel, freq, esc_min_duty); 
-
-    // Motor 3
+    m2.init(m2.gpio, m2.tim, m2.pin);
     m3.init(m3.gpio, m3.tim, m3.pin); 
-    m3.setSignal(m3.tim, m3.channel, freq, esc_min_duty); 
-
-    // Motor 4
     m4.init(m4.gpio, m4.tim, m4.pin); 
-    m4.setSignal(m4.tim, m4.channel,freq, esc_min_duty); 
+
+    // Set PWM signal for all motors using 50Hz and the min value for the ESC 1000 us
+    m1.setSignal(m1.tim, m1.channel, 50, 1000); 
+    m2.setSignal(m2.tim, m2.channel, 50, 1000); 
+    m3.setSignal(m3.tim, m3.channel, 50, 1000); 
+    m4.setSignal(m4.tim, m4.channel,50, 1000); 
 
     // Start all Motors
     m1.start(m1.tim, m1.channel); 

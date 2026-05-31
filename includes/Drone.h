@@ -31,6 +31,6 @@ extern motor_t m2;
 extern motor_t m3; 
 extern motor_t m4; 
 
-void drone_init(uint32_t freq, uint8_t esc_min_duty);
+void drone_init();
 
 #endif 
