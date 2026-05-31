@@ -14,7 +14,8 @@ SRC = \
     $(SRC_DIR)/gyro_filter.c        \
     $(SRC_DIR)/imu_mahony.c         \
     $(SRC_DIR)/pid_controller.c     \
-    $(SRC_DIR)/math_impl.c     \
+    $(SRC_DIR)/math_impl.c     		\
+	   $(SRC_DIR)/mpu6050.c     	\
     $(SRC_DIR)/main.c
 
 INCLUDES = \

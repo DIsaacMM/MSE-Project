@@ -22,12 +22,12 @@
 #include <stdbool.h>
 #include "PWM.h"
 #include "Timer.h"
-#include "MPU6050.h"
 #include "UART.h"
 #include "gyro_filter.h"
 #include "imu_mahony.h"
 #include "pid_controller.h"
 #include "Drone.h"
+#include "mpu6050.h"
 
 /* ── Hardware ── */
 #define FREQUENCY        50
