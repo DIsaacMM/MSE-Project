@@ -72,24 +72,24 @@ void drone_init(uint32_t freq, uint8_t esc_min_duty)
     m3.start(m3.tim, m3.channel);  
     m4.start(m4.tim, m4.channel); 
 }
+// Future Implementations
+// void drone_up()
+// {
 
-void drone_up()
-{
-
-}
+// }
 
 
-void drone_down()
-{
+// void drone_down()
+// {
 
-}
+// }
 
-void drone_left()
-{
+// void drone_left()
+// {
 
-}
+// }
 
-void drone_right()
-{
+// void drone_right()
+// {
 
-}
+// }
