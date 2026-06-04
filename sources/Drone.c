@@ -25,41 +25,45 @@
         .stop = pwm_stop
     }; 
 
-    motor_t m3 = {
-        .pin = 2, 
-        .gpio = A,
-        .channel = channel_3, 
-        .tim = TIM_2, 
-        .init = pwm_init, 
-        .setSignal = pwm_setSignal, 
-        .start = pwm_start, 
+        motor_t m3 = {
+        .pin = 6,
+        .gpio = B,
+        .channel = channel_1,
+        .tim = TIM_4,
+        .init = pwm_init,
+        .setSignal = pwm_setSignal,
+        .start = pwm_start,
         .stop = pwm_stop
-    }; 
+    };
 
     motor_t m4 = {
-        .pin = 3, 
-        .gpio = A,
-        .channel = channel_4, 
-        .tim = TIM_2, 
-        .init = pwm_init, 
-        .setSignal = pwm_setSignal, 
-        .start = pwm_start, 
+        .pin = 7,
+        .gpio = B,
+        .channel = channel_2,
+        .tim = TIM_4,
+        .init = pwm_init,
+        .setSignal = pwm_setSignal,
+        .start = pwm_start,
         .stop = pwm_stop
-    }; 
+    };
 
 // Initialize the 4 motors
 void drone_init()
 {
-    // Initialize PWM for all Motors 
+    // Motor 1
     m1.init(m1.gpio, m1.tim, m1.pin); 
-    m2.init(m2.gpio, m2.tim, m2.pin);
-    m3.init(m3.gpio, m3.tim, m3.pin); 
-    m4.init(m4.gpio, m4.tim, m4.pin); 
-
-    // Set PWM signal for all motors using 50Hz and the min value for the ESC 1000 us
     m1.setSignal(m1.tim, m1.channel, 50, 1000); 
+
+    // Motor 2
+    m2.init(m2.gpio, m2.tim, m2.pin); 
     m2.setSignal(m2.tim, m2.channel, 50, 1000); 
+
+    // Motor 3
+    m3.init(m3.gpio, m3.tim, m3.pin); 
     m3.setSignal(m3.tim, m3.channel, 50, 1000); 
+
+    // Motor 4
+    m4.init(m4.gpio, m4.tim, m4.pin); 
     m4.setSignal(m4.tim, m4.channel,50, 1000); 
 
     // Start all Motors

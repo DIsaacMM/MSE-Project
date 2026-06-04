@@ -62,7 +62,7 @@
 #define MOTOR_CORR_LIMIT_US   250.0f   /* limite de correccion por motor    */
 #define UART_PRINT_MS         100
 #define PWM_UPDATE_MS         20       /* envio fisico a ESC (50 Hz)        */
-#define FLIGHT_TIME_MS        2000     /* vuela este tiempo y luego aterriza */
+#define FLIGHT_TIME_MS        5000     /* vuela este tiempo y luego aterriza */
 #define LANDING_TIME_MS       3000     /* duracion del descenso gradual      */
 
 /* ── Estado global ── */
@@ -154,22 +154,7 @@ int main(void)
     uart_sendLine("=== Flight Controller 4 Motores (Drone.h) ===");
 
     /* ── Inicializar los 4 motores via Drone.h — minimo inmediato ── */
-    m1.init(m1.gpio, m1.tim, m1.pin);
-    uart_sendLine("Motores 1. Enviando señal minima...");
-    m2.init(m2.gpio, m2.tim, m2.pin);
-    uart_sendLine("Motores 2. Enviando señal minima...");
-    m3.init(m3.gpio, m3.tim, m3.pin);
-    uart_sendLine("Motores 3. Enviando señal minima...");
-    m4.init(m4.gpio, m4.tim, m4.pin);
-    uart_sendLine("Motores 4. Enviando señal minima...");
-    
-    motorPWM[0] = motorPWM[1] = motorPWM[2] = motorPWM[3] = ESC_MIN_US;
-    motors_write();
-
-    m1.start(m1.tim, m1.channel);
-    m2.start(m2.tim, m2.channel);
-    m3.start(m3.tim, m3.channel);
-    m4.start(m4.tim, m4.channel);
+    drone_init();
 
     /* ── Armar ESCs 8s (valor probado) ── */
     uart_sendLine("Armando ESCs (8s)... espera pitido da-da-da");
@@ -246,12 +231,13 @@ int main(void)
     uart_sendLine("----------------------------------------------------");
 
     uint32_t lastPWM = loopCount;
-    for(uint32_t i = 1050; i < THROTTLE_BASE; i++) 
-    {
-        motors_set_all((uint16_t)i);
+    for(uint32_t i = 1050; i<THROTTLE_BASE; i++)
+    {   
+        uart_sendInt(i);
+        uart_sendLine("");
+        motors_set_all(i);
         timer_delay_ms(DELAY_TIM, 20);
     }
-
     /* ── Main loop ── */
     while (1)
     {

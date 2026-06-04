@@ -97,12 +97,12 @@
  * ========================================================= */
 
 /* Roll (eje X) */
-#define PID_KP_ROLL     15.0f    /* Prueba de banco: escala directa °→output */
+#define PID_KP_ROLL     0.05f    /* Prueba de banco: escala directa °→output */
 #define PID_KI_ROLL     0.0f     /* Ki=0 durante prueba de banco             */
 #define PID_KD_ROLL     0.0f     /* Kd=0 durante prueba de banco             */
 
 /* Pitch (eje Y) — normalmente igual a Roll */
-#define PID_KP_PITCH    15.0f
+#define PID_KP_PITCH    0.05f
 #define PID_KI_PITCH    0.0f
 #define PID_KD_PITCH    0.0f
 
