@@ -49,7 +49,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "gyro_filter.h"   /* PT1Filter_t, PT2Filter_t */
-#include "math_utils.h"    /* memset, sqrtf */
+#include "math_utils.h"     /* floatConstrain */
 
 /* =========================================================
  *  CONSTANTES DE CONFIGURACIÓN
@@ -97,28 +97,19 @@
  * ========================================================= */
 
 /* Roll (eje X) */
-<<<<<<< HEAD
-#define PID_KP_ROLL     0.5f
-#define PID_KI_ROLL     0.0f
-#define PID_KD_ROLL     0.0f
+#define PID_KP_ROLL     15.0f    /* Prueba de banco: escala directa °→output */
+#define PID_KI_ROLL     0.0f     /* Ki=0 durante prueba de banco             */
+#define PID_KD_ROLL     0.0f     /* Kd=0 durante prueba de banco             */
 
 /* Pitch (eje Y) — normalmente igual a Roll */
-#define PID_KP_PITCH    0.5f
-=======
-#define PID_KP_ROLL     1.0f
-#define PID_KI_ROLL     0.05f
-#define PID_KD_ROLL     0.0f
-
-/* Pitch (eje Y) — normalmente igual a Roll */
-#define PID_KP_PITCH    0.0f
->>>>>>> 3e57cf3480f9dbb1015833576ed7eb5f1e135786
+#define PID_KP_PITCH    15.0f
 #define PID_KI_PITCH    0.0f
 #define PID_KD_PITCH    0.0f
 
 /* Yaw (eje Z) — generalmente sin D-term */
-#define PID_KP_YAW      0.0f
-#define PID_KI_YAW      0.0f
-#define PID_KD_YAW      0.0f
+#define PID_KP_YAW      0.040f
+#define PID_KI_YAW      0.060f
+#define PID_KD_YAW      0.0f    /* D en yaw causa zumbido con motores brushless */
 
 /* =========================================================
  *  TIPOS DE DATOS
