@@ -52,15 +52,15 @@ void drone_init()
 {
     // Motor 1
     m1.init(m1.gpio, m1.tim, m1.pin); 
-    m1.setSignal(m1.tim, m1.channel, 50, 1000); 
+    m1.setSignal(m1.tim, m1.channel,50, 1000); 
 
     // Motor 2
     m2.init(m2.gpio, m2.tim, m2.pin); 
-    m2.setSignal(m2.tim, m2.channel, 50, 1000); 
+    m2.setSignal(m2.tim, m2.channel,50, 1000); 
 
     // Motor 3
     m3.init(m3.gpio, m3.tim, m3.pin); 
-    m3.setSignal(m3.tim, m3.channel, 50, 1000); 
+    m3.setSignal(m3.tim, m3.channel,50, 1000); 
 
     // Motor 4
     m4.init(m4.gpio, m4.tim, m4.pin); 

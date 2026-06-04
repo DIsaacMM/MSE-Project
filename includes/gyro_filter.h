@@ -36,7 +36,7 @@
 /* Umbral de movimiento durante calibración (en raw ADC counts).
  * Si la desviación estándar supera este valor, se reinicia.
  * MPU6050 a ±2000°/s: 1 LSB ≈ 0.061°/s  → umbral ~25 LSB */
-#define GYRO_CALIB_MOVE_THRESHOLD  110.0f
+#define GYRO_CALIB_MOVE_THRESHOLD  105.0f
 
 /* Factor de escala del MPU6050 en modo ±2000°/s (predeterminado en GY-521):
  * 16.4 LSB por °/s  → dividir raw por 16.4 para obtener °/s
@@ -49,7 +49,7 @@
 #define GYRO_DT             (1.0f / GYRO_LOOP_HZ)      /* segundos        */
 
 /* Frecuencias de corte de los filtros (Hz) — valores típicos Betaflight */
-#define GYRO_LPF1_HZ        120.0f   /* Lowpass principal (PT2)           */
+#define GYRO_LPF1_HZ        80.0f   /* Lowpass principal (PT2)           */
 #define GYRO_LPF2_HZ        200.0f   /* Lowpass de downsample (PT1)       */
 #define GYRO_NOTCH1_HZ      0.0f     /* Notch 1: 0 = desactivado          */
 #define GYRO_NOTCH1_CUT_HZ  0.0f

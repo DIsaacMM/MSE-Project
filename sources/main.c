@@ -23,6 +23,12 @@
  *
  * PID corre continuo a 1 kHz y escribe motorPWM[].
  * El PWM fisico se envia a los ESC cada PWM_UPDATE_MS (20 ms / 50 Hz).
+ *
+ * CAMBIOS vs version anterior:
+ *   - Corregido signo de spPitch (era +pitch, ahora -pitch)
+ *   - Eliminada zona muerta manual del integrador (reemplazada por iterm_relax en PID)
+ *   - pidUpdate() recibe throttleNow para TPA
+ *   - Rampa de arranque movida al lugar correcto (antes del vuelo activo)
  */
 
 #include <stdint.h>
@@ -55,15 +61,21 @@
 #define LED_OFF()           (GPIOA->BSRR = (1U << 21))
 
 /* ── Parametros ajustables ── */
-#define THROTTLE_BASE         1200
-#define ITERM_ZONE_DEG        5.0f
-#define LEVEL_KP_DPS_PER_DEG  2.0f     /* setpoint = angulo * este factor   */
-#define LEVEL_RATE_LIMIT_DPS  120.0f   /* limite del setpoint en dps        */
-#define MOTOR_CORR_LIMIT_US   250.0f   /* limite de correccion por motor    */
+#define THROTTLE_BASE         1220
+#define LEVEL_KP_DPS_PER_DEG  1.5f     /* lazo externo angulo -> dps (mas suave en 7") */
+#define LEVEL_RATE_LIMIT_DPS  120.0f   /* limite del setpoint en dps                   */
+#define MOTOR_CORR_LIMIT_US   200.0f   /* limite de correccion por motor (reducido 7") */
 #define UART_PRINT_MS         100
-#define PWM_UPDATE_MS         20       /* envio fisico a ESC (50 Hz)        */
-#define FLIGHT_TIME_MS        5000     /* vuela este tiempo y luego aterriza */
-#define LANDING_TIME_MS       3000     /* duracion del descenso gradual      */
+#define PWM_UPDATE_MS         20       /* envio fisico a ESC (50 Hz)                   */
+#define FLIGHT_TIME_MS        25000    /* vuela este tiempo y luego aterriza           */
+#define LANDING_TIME_MS       3000    /* duracion del descenso gradual                */
+#define PITCH_Trim_deg        3.5f     /* Ajuste fino del trim de pitch (en grados)    */
+
+/* Rampa de arranque */
+#define RAMP_STEP_MS          20       /* un paso cada 20 ms                           */
+
+/* ── Filtro PT1 para acelerometro ── */
+#define ACCEL_LPF_HZ          15.0f    /* corta vibraciones de motor antes de Mahony */
 
 /* ── Estado global ── */
 static GyroPipeline_t  gyroPipeline;
@@ -78,10 +90,15 @@ static volatile bool     pidLoopFlag = false;
 static volatile uint32_t loopCount   = 0;
 static uint32_t          lastPrint   = 0;
 
+/* Filtros PT1 por eje del acelerometro — NUEVO */
+static PT1Filter_t     accelFilterX;
+static PT1Filter_t     accelFilterY;
+static PT1Filter_t     accelFilterZ;
+
 /* Protocolo de aterrizaje */
-static uint32_t          flightStart = 0;                  /* inicio del vuelo (timer) */
-static bool              disarmed    = false;              /* true al terminar aterrizaje */
-static float             throttleNow = (float)ESC_MIN_US;  /* throttle base actual */
+static uint32_t          flightStart = 0;
+static bool              disarmed    = false;
+static float             throttleNow = (float)ESC_MIN_US;
 
 /* Setpoints (dps) y correcciones (us) por eje — para debug */
 static float spRoll  = 0.0f, spPitch = 0.0f;
@@ -137,6 +154,21 @@ static void motors_set_all(uint16_t us)
     motors_write();
 }
 
+/* Rampa suave de ESC_MIN_US hasta target_us en pasos de 1 us cada RAMP_STEP_MS.
+ * Sigue procesando pidLoopFlag para no perder el 1kHz durante la rampa. */
+static void motors_ramp_to(uint16_t target_us)
+{
+    for (uint16_t v = ESC_MIN_US; v < target_us; v++) {
+        m1.setSignal(m1.tim, m1.channel, FREQUENCY, v);
+        m2.setSignal(m2.tim, m2.channel, FREQUENCY, v);
+        m3.setSignal(m3.tim, m3.channel, FREQUENCY, v);
+        m4.setSignal(m4.tim, m4.channel, FREQUENCY, v);
+        timer_delay_ms(DELAY_TIM, RAMP_STEP_MS);
+        /* Drenar el flag del PID para no acumular deuda */
+        if (pidLoopFlag) pidLoopFlag = false;
+    }
+}
+
 void TIM5_IRQHandler(void)
 {
     if (TIM5->SR & (1U << 0)) {
@@ -149,17 +181,17 @@ void TIM5_IRQHandler(void)
 int main(void)
 {
     uart_init();
+    uart_sendLine("=== Flight Controller 4 Motores (Drone.h) ===");
     LED_INIT();
     LED_OFF();
-    uart_sendLine("=== Flight Controller 4 Motores (Drone.h) ===");
 
-    /* ── Inicializar los 4 motores via Drone.h — minimo inmediato ── */
+    /* ── Inicializar los 4 motores via Drone.h ── */
     drone_init();
 
-    /* ── Armar ESCs 8s (valor probado) ── */
-    uart_sendLine("Armando ESCs (8s)... espera pitido da-da-da");
+    /* ── Armar ESCs (8s — espera pitido da-da-da) ── */
+    uart_sendLine("Armando ESCs (8s)...");
     timer_init(DELAY_TIM);
-    timer_delay_ms(DELAY_TIM, 8000);
+    timer_delay_ms(DELAY_TIM, 5000);
 
     /* ── MPU6050 ── */
     mpu6050_init(I2C_PORT, I2C_SCL_PIN, I2C_SDA_PIN, I2C_PIN_MODE);
@@ -173,6 +205,11 @@ int main(void)
     imuInit(&imuState);
     pidInit(&pidState);
     tim5_init_1kHz();
+
+    float accelK = pt1FilterGain(ACCEL_LPF_HZ, GYRO_DT);
+    pt1FilterInit(&accelFilterX, accelK);
+    pt1FilterInit(&accelFilterY, accelK);
+    pt1FilterInit(&accelFilterZ, accelK);
 
     /* ── Calibracion ── */
     uart_sendLine(">>> PON EL DRON QUIETO Y PLANO <<<");
@@ -214,34 +251,34 @@ int main(void)
     }
     uart_sendLine("IMU listo.");
 
-    /* ── Arrancar motores a base — espera no bloqueante 1s ── */
-    uart_sendLine("Arrancando motores...");
+    /* ── Rampa de arranque: sube suavemente de 1000 a THROTTLE_BASE ── */
+    uart_sendLine("Rampa de arranque...");
+    pidResetIterm(&pidState);
+    motors_ramp_to(THROTTLE_BASE);
     motors_set_all(THROTTLE_BASE);
+
+    /* ── Espera no bloqueante 1s a THROTTLE_BASE antes de activar PID ── */
     {
         uint32_t waitStart = loopCount;
         while ((loopCount - waitStart) < 1000) {
             if (pidLoopFlag) pidLoopFlag = false;
         }
     }
-    LED_ON();
-    flightStart = loopCount;   /* arranca el timer de vuelo */
 
-    uart_sendLine("PID activo. Vuela 3s y luego aterriza en rampa.");
-    uart_sendLine("R P | SP_R SP_P | CR CP CY | m1 m2 m3 m4");
-    uart_sendLine("----------------------------------------------------");
+    LED_ON();
+    pidResetIterm(&pidState);      /* reset limpio antes de vuelo activo */
+    flightStart = loopCount;
+
+    uart_sendLine("PID activo.");
+    uart_sendLine("FASE |R    P    | T |SP_R  SP_P |CR    CP    CY    |m1   m2   m3   m4");
+    uart_sendLine("---------------------------------------------------------------------------------");
 
     uint32_t lastPWM = loopCount;
-    for(uint32_t i = 1050; i<THROTTLE_BASE; i++)
-    {   
-        uart_sendInt(i);
-        uart_sendLine("");
-        motors_set_all(i);
-        timer_delay_ms(DELAY_TIM, 20);
-    }
+
     /* ── Main loop ── */
     while (1)
     {
-        /* ── PID @ 1kHz — CONTINUO (siempre escribe motorPWM[]) ── */
+        /* ── PID @ 1kHz ── */
         if (pidLoopFlag) {
             pidLoopFlag = false;
 
@@ -249,12 +286,10 @@ int main(void)
             mpu6050_readData(&mpuData);
             gyroPipelineUpdate(&gyroPipeline,
                                mpuData.gx, mpuData.gy, mpuData.gz);
-
-            float ax = (float)mpuData.ax * ACC_SCALE_G;
-            float ay = (float)mpuData.ay * ACC_SCALE_G;
-            float az = (float)mpuData.az * ACC_SCALE_G;
-            bool accOk = imuAccIsHealthy(ax, ay, az);
-
+            float ax    = pt1FilterApply(&accelFilterX, (float)mpuData.ax * ACC_SCALE_G);
+            float ay    = pt1FilterApply(&accelFilterY, (float)mpuData.ay * ACC_SCALE_G);
+            float az    = pt1FilterApply(&accelFilterZ, (float)mpuData.az * ACC_SCALE_G);
+            bool accOk  = imuAccIsHealthy(ax, ay, az);
             imuMahonyUpdate(&imuState, 0.001f,
                             gyroPipeline.gyroRad[AXIS_X],
                             gyroPipeline.gyroRad[AXIS_Y],
@@ -264,55 +299,41 @@ int main(void)
             float roll  = imuGetRollDeg(&imuState);
             float pitch = imuGetPitchDeg(&imuState);
 
-            /* 2. Lazo externo: angulo -> setpoint de velocidad (dps).
-             *    (Si un signo sale invertido en banco, usar -angulo * KP) */
-            spRoll  = clampf(roll  * LEVEL_KP_DPS_PER_DEG,
+            /* 2. Lazo externo: angulo -> setpoint de velocidad angular (dps).
+             *    spRoll:  signo negativo — roll +4deg pide -dps para volver al plano.
+             *    spPitch: signo negativo — igual convencion que roll (corregido). */
+            spRoll  = clampf(-roll  * LEVEL_KP_DPS_PER_DEG,
                              -LEVEL_RATE_LIMIT_DPS, LEVEL_RATE_LIMIT_DPS);
-            spPitch = clampf(pitch * LEVEL_KP_DPS_PER_DEG,
-                             -LEVEL_RATE_LIMIT_DPS, LEVEL_RATE_LIMIT_DPS);
+            spPitch = clampf(-(pitch + PITCH_Trim_deg) * LEVEL_KP_DPS_PER_DEG,
+                            -LEVEL_RATE_LIMIT_DPS, LEVEL_RATE_LIMIT_DPS);
 
-            /* 3. Zona muerta del integrador (congela Ki si angulo grande) */
-            bool inItermZone = (roll  > -ITERM_ZONE_DEG && roll  < ITERM_ZONE_DEG &&
-                                pitch > -ITERM_ZONE_DEG && pitch < ITERM_ZONE_DEG);
-            float savedKiR = pidState.gains[PID_AXIS_ROLL].Ki;
-            float savedKiP = pidState.gains[PID_AXIS_PITCH].Ki;
-            if (!inItermZone) {
-                pidState.gains[PID_AXIS_ROLL].Ki  = 0.0f;
-                pidState.gains[PID_AXIS_PITCH].Ki = 0.0f;
-            }
-
-            /* 4. PID (yaw en rate, setpoint 0) */
-            pidUpdate(&pidState, spRoll, spPitch, 0.0f,
-                      gyroPipeline.gyroDPS[AXIS_X],
-                      gyroPipeline.gyroDPS[AXIS_Y],
-                      gyroPipeline.gyroDPS[AXIS_Z]);
-
-            pidState.gains[PID_AXIS_ROLL].Ki  = savedKiR;
-            pidState.gains[PID_AXIS_PITCH].Ki = savedKiP;
-
-            /* 5. Protocolo de fases: VUELO (FLIGHT_TIME_MS) ->
-             *    ATERRIZAJE (rampa LANDING_TIME_MS) -> APAGADO (desarmado).
-             *    El PID sigue activo durante todo el descenso. */
+            /* 3. Protocolo de fases: VUELO -> ATERRIZAJE -> APAGADO */
             uint32_t elapsed = loopCount - flightStart;
 
             if (disarmed || elapsed >= (FLIGHT_TIME_MS + LANDING_TIME_MS)) {
-                /* Aterrizaje terminado: motores apagados y desarmado (latch) */
                 disarmed = true;
                 motors_off();
                 LED_OFF();
             } else {
                 /* Throttle base segun la fase */
                 if (elapsed < FLIGHT_TIME_MS) {
-                    throttleNow = (float)THROTTLE_BASE;                  /* VUELO */
+                    throttleNow = (float)THROTTLE_BASE;
                 } else {
-                    /* ATERRIZAJE: baja poco a poco de THROTTLE_BASE a ESC_MIN_US */
                     uint32_t landElapsed = elapsed - FLIGHT_TIME_MS;
                     throttleNow = (float)THROTTLE_BASE
                                   - (float)(THROTTLE_BASE - ESC_MIN_US)
                                     * (float)landElapsed / (float)LANDING_TIME_MS;
                 }
 
-                /* Correcciones por eje — limitadas */
+                /* 4. PID — recibe throttleNow para TPA interno */
+                pidUpdate(&pidState,
+                          spRoll, spPitch, 0.0f,
+                          gyroPipeline.gyroDPS[AXIS_X],
+                          gyroPipeline.gyroDPS[AXIS_Y],
+                          gyroPipeline.gyroDPS[AXIS_Z],
+                          throttleNow);
+
+                /* 5. Correcciones limitadas */
                 corrRoll  = clampf(pidState.output[PID_AXIS_ROLL].sum,
                                    -MOTOR_CORR_LIMIT_US, MOTOR_CORR_LIMIT_US);
                 corrPitch = clampf(pidState.output[PID_AXIS_PITCH].sum,
@@ -320,12 +341,12 @@ int main(void)
                 corrYaw   = clampf(pidState.output[PID_AXIS_YAW].sum,
                                    -MOTOR_CORR_LIMIT_US, MOTOR_CORR_LIMIT_US);
 
-                /* 6. Mixer Quad-X — layout 3-1 / 4-2 (base = throttleNow)
+                /* 6. Mixer Quad-X — layout 3-1 / 4-2
                  *            Roll  Pitch  Yaw
                  *   m3 FL:    +     -      -
                  *   m1 FR:    -     -      +
                  *   m4 RL:    +     +      +
-                 *   m2 RR:    -     +      -                */
+                 *   m2 RR:    -     +      -   */
                 float t = throttleNow;
                 motorPWM[0] = clamp_us(t - corrRoll - corrPitch + corrYaw);  /* m1 FR */
                 motorPWM[1] = clamp_us(t - corrRoll + corrPitch - corrYaw);  /* m2 RR */
@@ -334,31 +355,39 @@ int main(void)
             }
         }
 
-        /* ── PWM @ 50Hz — envio fisico a los ESC en intervalos de 20ms ── */
+        /* ── PWM @ 50Hz ── */
         if ((loopCount - lastPWM) >= PWM_UPDATE_MS) {
             lastPWM = loopCount;
-            motors_write();
+            if (!disarmed) motors_write();
         }
 
         /* ── UART debug @ 100ms ── */
         if ((loopCount - lastPrint) >= UART_PRINT_MS) {
             lastPrint = loopCount;
-            uint32_t el   = loopCount - flightStart;
-            const char *ph = disarmed ? "OFF " :
+            uint32_t el    = loopCount - flightStart;
+            const char *ph = disarmed          ? "OFF " :
                              (el < FLIGHT_TIME_MS ? "FLY " : "LAND");
+
             uart_sendString(ph);
-            uart_sendString(" R:");     uart_sendFloat(imuGetRollDeg(&imuState),  1);
-            uart_sendString(" P:");     uart_sendFloat(imuGetPitchDeg(&imuState), 1);
-            uart_sendString(" | T:");   uart_sendInt((uint16_t)throttleNow);
-            uart_sendString(" | SP_R:"); uart_sendFloat(spRoll,  1);
-            uart_sendString(" SP_P:");   uart_sendFloat(spPitch, 1);
-            uart_sendString(" | CR:");  uart_sendFloat(corrRoll,  1);
-            uart_sendString(" CP:");    uart_sendFloat(corrPitch, 1);
-            uart_sendString(" CY:");    uart_sendFloat(corrYaw,   1);
-            uart_sendString(" | m1:");  uart_sendInt((uint16_t)motorPWM[0]);
-            uart_sendString(" m2:");    uart_sendInt((uint16_t)motorPWM[1]);
-            uart_sendString(" m3:");    uart_sendInt((uint16_t)motorPWM[2]);
-            uart_sendString(" m4:");    uart_sendInt((uint16_t)motorPWM[3]);
+            uart_sendString("R:");      uart_sendFloat(imuGetRollDeg(&imuState),  1);
+            uart_sendString("P:");      uart_sendFloat(imuGetPitchDeg(&imuState), 1);
+            uart_sendString("|T:");    uart_sendInt((uint16_t)throttleNow);
+            uart_sendString("|SP_R:"); uart_sendFloat(spRoll,  1);
+            uart_sendString("SP_P:");   uart_sendFloat(spPitch, 1);
+            uart_sendString("|CR:");   uart_sendFloat(corrRoll,  1);
+            uart_sendString("CP:");     uart_sendFloat(corrPitch, 1);
+            uart_sendString("CY:");     uart_sendFloat(corrYaw,   1);
+            /* Terminos PID individuales para diagnostico */
+            uart_sendString("|PR:");   uart_sendFloat(pidState.output[PID_AXIS_ROLL].P,  1);
+            uart_sendString("IR:");     uart_sendFloat(pidState.output[PID_AXIS_ROLL].I,  1);
+            uart_sendString("DR:");     uart_sendFloat(pidState.output[PID_AXIS_ROLL].D,  1);
+            uart_sendString("|PP:");   uart_sendFloat(pidState.output[PID_AXIS_PITCH].P, 1);
+            uart_sendString("IP:");     uart_sendFloat(pidState.output[PID_AXIS_PITCH].I, 1);
+            uart_sendString("DP:");     uart_sendFloat(pidState.output[PID_AXIS_PITCH].D, 1);
+            uart_sendString("|m1:");   uart_sendInt((uint16_t)motorPWM[0]);
+            uart_sendString(" m2:");     uart_sendInt((uint16_t)motorPWM[1]);
+            uart_sendString(" m3:");     uart_sendInt((uint16_t)motorPWM[2]);
+            uart_sendString(" m4:");     uart_sendInt((uint16_t)motorPWM[3]);
             uart_sendLine("");
         }
     }
