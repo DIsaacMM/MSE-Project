@@ -3,7 +3,6 @@
 #define DRONE_H
 
 #include "PWM.h"
-#include "Sensor.h"
 #include "Timer.h"
 
 typedef void (*motor_init_t)(port_t, tim_t, uint8_t);     
@@ -31,6 +30,6 @@ extern motor_t m2;
 extern motor_t m3; 
 extern motor_t m4; 
 
-void drone_init(uint32_t freq, uint8_t esc_min_duty);
+void drone_init();
 
 #endif 
