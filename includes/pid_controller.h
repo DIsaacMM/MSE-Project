@@ -50,7 +50,7 @@
  * Betaflight: iterm_relax_cutoff — aqui usamos umbral fijo.
  * Ajustar: bajar si el I sigue creciendo en transitorios,
  *          subir si el I no responde suficiente en hover. */
-#define ITERM_RELAX_THRESHOLD_DPS   15.0f
+#define ITERM_RELAX_THRESHOLD_DPS   60.0f
 
 /* ── TPA (Throttle PID Attenuation) ──────────────────────
  * Reduce Kp y Kd linealmente entre TPA_BREAKPOINT y ESC_MAX_US.
@@ -72,19 +72,19 @@
  * ========================================================= */
 
 /* Roll (eje X) */
-#define PID_KP_ROLL     1.5f
-#define PID_KI_ROLL     0.02f    /* Ki=0 durante tuning inicial */
-#define PID_KD_ROLL     0.01f
+#define PID_KP_ROLL     1.250f
+#define PID_KI_ROLL     0.040f    /* Ki=0 durante tuning inicial */
+#define PID_KD_ROLL     0.010f
 
 /* Pitch (eje Y) */
-#define PID_KP_PITCH    1.5f
-#define PID_KI_PITCH    0.02f    /* Ki=0 durante tuning inicial */
-#define PID_KD_PITCH    0.01f
+#define PID_KP_PITCH    1.250f
+#define PID_KI_PITCH    0.040f    /* Ki=0 durante tuning inicial */
+#define PID_KD_PITCH    0.010f
 
 /* Yaw (eje Z) */
-#define PID_KP_YAW      0.025f
-#define PID_KI_YAW      0.030f
-#define PID_KD_YAW      0.0f   /* D en yaw causa zumbido con brushless */
+#define PID_KP_YAW      0.40f    /* Mucha más fuerza inmediata para frenar la rotación */
+#define PID_KI_YAW      0.060f   /* Más memoria a largo plazo para vencer desbalances físicos */
+#define PID_KD_YAW      0.0f     /* Mantener en 0, muy bien */
 
 /* =========================================================
  *  TIPOS DE DATOS

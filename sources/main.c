@@ -61,15 +61,15 @@
 #define LED_OFF()           (GPIOA->BSRR = (1U << 21))
 
 /* ── Parametros ajustables ── */
-#define THROTTLE_BASE         1220
-#define LEVEL_KP_DPS_PER_DEG  1.5f     /* lazo externo angulo -> dps (mas suave en 7") */
+#define THROTTLE_BASE         1365
+#define LEVEL_KP_DPS_PER_DEG  1.0f     /* lazo externo angulo -> dps (mas suave en 7") */
 #define LEVEL_RATE_LIMIT_DPS  120.0f   /* limite del setpoint en dps                   */
 #define MOTOR_CORR_LIMIT_US   200.0f   /* limite de correccion por motor (reducido 7") */
 #define UART_PRINT_MS         100
 #define PWM_UPDATE_MS         20       /* envio fisico a ESC (50 Hz)                   */
-#define FLIGHT_TIME_MS        25000    /* vuela este tiempo y luego aterriza           */
+#define FLIGHT_TIME_MS        15000    /* vuela este tiempo y luego aterriza           */
 #define LANDING_TIME_MS       3000    /* duracion del descenso gradual                */
-#define PITCH_Trim_deg        3.5f     /* Ajuste fino del trim de pitch (en grados)    */
+#define PITCH_Trim_deg        6.0f     /* Ajuste fino del trim de pitch (en grados)    */
 
 /* Rampa de arranque */
 #define RAMP_STEP_MS          20       /* un paso cada 20 ms                           */
@@ -304,7 +304,7 @@ int main(void)
              *    spPitch: signo negativo — igual convencion que roll (corregido). */
             spRoll  = clampf(-roll  * LEVEL_KP_DPS_PER_DEG,
                              -LEVEL_RATE_LIMIT_DPS, LEVEL_RATE_LIMIT_DPS);
-            spPitch = clampf(-(pitch + PITCH_Trim_deg) * LEVEL_KP_DPS_PER_DEG,
+            spPitch = clampf(-(pitch - PITCH_Trim_deg) * LEVEL_KP_DPS_PER_DEG,
                             -LEVEL_RATE_LIMIT_DPS, LEVEL_RATE_LIMIT_DPS);
 
             /* 3. Protocolo de fases: VUELO -> ATERRIZAJE -> APAGADO */
@@ -371,6 +371,7 @@ int main(void)
             uart_sendString(ph);
             uart_sendString("R:");      uart_sendFloat(imuGetRollDeg(&imuState),  1);
             uart_sendString("P:");      uart_sendFloat(imuGetPitchDeg(&imuState), 1);
+            uart_sendString("Y:");      uart_sendFloat(imuGetYawDeg(&imuState), 1);
             uart_sendString("|T:");    uart_sendInt((uint16_t)throttleNow);
             uart_sendString("|SP_R:"); uart_sendFloat(spRoll,  1);
             uart_sendString("SP_P:");   uart_sendFloat(spPitch, 1);
@@ -384,6 +385,10 @@ int main(void)
             uart_sendString("|PP:");   uart_sendFloat(pidState.output[PID_AXIS_PITCH].P, 1);
             uart_sendString("IP:");     uart_sendFloat(pidState.output[PID_AXIS_PITCH].I, 1);
             uart_sendString("DP:");     uart_sendFloat(pidState.output[PID_AXIS_PITCH].D, 1);
+            uart_sendString("|PY:");   uart_sendFloat(pidState.output[PID_AXIS_YAW].P,   1);
+            uart_sendString("IY:");     uart_sendFloat(pidState.output[PID_AXIS_YAW].I,   1);
+            uart_sendString("DY:");     uart_sendFloat(pidState.output[PID_AXIS_YAW].D,   1);
+
             uart_sendString("|m1:");   uart_sendInt((uint16_t)motorPWM[0]);
             uart_sendString(" m2:");     uart_sendInt((uint16_t)motorPWM[1]);
             uart_sendString(" m3:");     uart_sendInt((uint16_t)motorPWM[2]);
